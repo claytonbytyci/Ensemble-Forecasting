@@ -19,10 +19,6 @@ venv/
 # Jupyter
 .ipynb_checkpoints/
 
-# Data
-/data/*
-!/data/.gitkeep
-
 # Logs
 *.log
 
