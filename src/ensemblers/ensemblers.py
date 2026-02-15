@@ -1,5 +1,5 @@
 # forecast_ensembles.py
-"""
+r"""
 Forecast combination ensemblers (online/sequential).
 
 Implements exactly the following ensemblers:
