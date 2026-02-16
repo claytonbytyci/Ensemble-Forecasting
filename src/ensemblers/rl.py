@@ -1,9 +1,9 @@
 # rl_ensemblers.py
 
 import numpy as np
-from forecast_combiners import (
+from ensemblers import (
     MeanCombiner,
-    MedianCombiner,
+    MedianEnsembler,
     OGDCombiner,
     MWUMCombiner,
     OGDConcentrationCombiner,

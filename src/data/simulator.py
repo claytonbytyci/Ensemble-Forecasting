@@ -1,6 +1,6 @@
 import numpy as np
 from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Literal
 
 # -----------------------------
 # 1) Macro environment simulator
@@ -66,6 +66,42 @@ def _default_config(T=600, seed=0) -> MacroSimConfig:
 
     # SV mean levels (log variance): higher in regime 1 (high uncertainty) and 2 (supply shocks)
     cfg.sv_mu = np.array([-1.2, -0.3, -0.6])
+    return cfg
+
+
+def _discriminating_config(T=600, seed=0) -> MacroSimConfig:
+    """
+    Harder simulation with stronger regime contrast and more pronounced instability.
+    This generally increases separability across forecasters/ensemblers.
+    """
+    cfg = MacroSimConfig(T=T, seed=seed)
+    # More frequent switching than baseline, with persistent regimes.
+    cfg.P = np.array([
+        [0.88, 0.09, 0.03],
+        [0.10, 0.82, 0.08],
+        [0.06, 0.12, 0.82],
+    ])
+
+    # Sharper structural differences.
+    cfg.alpha = np.array([0.15, 0.97, 0.45])   # very high persistence in regime 1
+    cfg.beta = np.array([0.20, -0.05, 0.12])   # slope weak/negative in regime 1
+    cfg.gamma = np.array([0.05, 0.25, 0.95])   # strong supply pass-through in regime 2
+
+    cfg.rho = np.array([0.78, 0.94, 0.72])
+    cfg.phi = np.array([0.25, 0.02, 0.08])     # policy transmission nearly broken in regime 1
+    cfg.sigma_x = np.array([0.35, 0.95, 0.75])
+
+    cfg.psi_pi = np.array([1.8, 0.7, 1.15])    # weak inflation response in regime 1
+    cfg.psi_x = np.array([0.5, 0.1, 0.25])
+    cfg.sigma_i = np.array([0.08, 0.25, 0.20])
+
+    cfg.u_rho = 0.70
+    cfg.sigma_u = 1.20
+
+    cfg.sv_phi = 0.96
+    cfg.sv_tau = 0.18
+    cfg.sv_mu = np.array([-1.6, 0.35, 0.10])   # much higher volatility in regimes 1/2
+    cfg.base_sigma_pi = 0.45
     return cfg
 
 
@@ -220,7 +256,10 @@ def build_forecaster_panel(
     horizons: List[int],
     window: int = 120,
     include_oracle: bool = True,
-    seed: int = 0
+    seed: int = 0,
+    forecaster_noise_std: float = 0.0,
+    forecaster_bias_std: float = 0.0,
+    oracle_params_cfg: Optional[MacroSimConfig] = None,
 ) -> Tuple[Dict[int, np.ndarray], List[str]]:
     """
     Creates a richer panel of N heterogeneous forecasters producing h-step inflation forecasts.
@@ -264,6 +303,10 @@ def build_forecaster_panel(
     Returns:
       forecast_panel: dict {h: array(T, N)} with NaNs where not enough history or t+h out of range
       names: list of forecaster names (length N)
+
+    Extra knobs to create more discriminating panels:
+      - forecaster_noise_std: idiosyncratic forecast noise scale (per forecaster and horizon)
+      - forecaster_bias_std: persistent forecaster bias scale (+ regime-loading bias)
     """
     rng = np.random.default_rng(seed)
 
@@ -310,8 +353,8 @@ def build_forecaster_panel(
             p2, p1 = p1, p_next
         return float(p1)
 
-    # oracle uses true regime parameters from the default config used in simulation
-    cfg_true = _default_config(T=10, seed=0)  # just to access params
+    # Oracle should use the same structural parameters as the simulated scenario.
+    cfg_true = oracle_params_cfg if oracle_params_cfg is not None else _default_config(T=10, seed=0)
     true_params = {
         "alpha": cfg_true.alpha,
         "beta": cfg_true.beta,
@@ -369,6 +412,8 @@ def build_forecaster_panel(
     names = [n for n, _, _ in forecasters]
     N = len(names)
     forecast_panel: Dict[int, np.ndarray] = {h: np.full((T, N), np.nan) for h in horizons}
+    forecaster_bias = rng.normal(0.0, forecaster_bias_std, size=N)
+    regime_loading = rng.normal(0.0, 0.6 * forecaster_bias_std, size=N)
 
     # cache fitted coefs per t for each (model, window, ridge) to avoid refitting duplicates
     # key: (t, model, window, ridge)
@@ -390,82 +435,91 @@ def build_forecaster_panel(
             for h in horizons:
                 if t + h >= T:
                     continue
+                fc = None
 
                 if ftype == "oracle":
-                    forecast_panel[h][t, j] = _oracle_state_forecast(h, t)
-                    continue
-
-                if ftype == "heur":
+                    fc = _oracle_state_forecast(h, t)
+                elif ftype == "heur":
                     if name == "LAST":
-                        forecast_panel[h][t, j] = pi_t
+                        fc = pi_t
                     elif name == "MEAN_12":
                         if t >= 11:
-                            forecast_panel[h][t, j] = float(np.mean(pi[t-11:t+1]))
+                            fc = float(np.mean(pi[t-11:t+1]))
                     elif name == "DRIFT_12":
                         if t >= 11:
                             m = float(np.mean(pi[t-11:t+1]))
-                            forecast_panel[h][t, j] = pi_t + h * (pi_t - m) / 12.0
+                            fc = pi_t + h * (pi_t - m) / 12.0
                     elif name == "EXP_SMOOTH":
-                        forecast_panel[h][t, j] = float(ewma_pi[t])
+                        fc = float(ewma_pi[t])
+                else:
+                    # linear models: rolling OLS
+                    model = pars["model"]
+                    win = int(pars["window"])
+                    ridge = float(pars["ridge"])
+
+                    if t < max(win, 5) + 2:
+                        continue
+                    start = max(0, t - win)
+                    # train to predict pi_{τ} for τ in (start+2,...,t) using lags aligned
+                    # Build arrays for τ = start+2,...,t:
+                    # y = pi_τ
+                    # pi_{τ-1}, pi_{τ-2}, x_{τ-1}, u_τ, rr_{τ-1}
+                    y_train = pi[start+2:t+1]
+                    pi_l1 = pi[start+1:t]
+                    pi_l2 = pi[start:t-1]
+                    x_l1 = x[start+1:t]
+                    u_now = u[start+2:t+1]
+                    rr_l1 = (i_rate[start+1:t] - pi[start+1:t])
+
+                    L = len(y_train)
+                    if L < 20:
+                        continue
+
+                    key = (t, model, win, ridge)
+                    if key not in coef_cache:
+                        if model == "AR1":
+                            X = np.column_stack([np.ones(L), pi_l1])
+                        elif model == "AR2":
+                            X = np.column_stack([np.ones(L), pi_l1, pi_l2])
+                        elif model == "ARX":
+                            X = np.column_stack([np.ones(L), pi_l1, x_l1])
+                        elif model == "ARX2":
+                            X = np.column_stack([np.ones(L), pi_l1, pi_l2, x_l1])
+                        elif model == "ARU":
+                            X = np.column_stack([np.ones(L), pi_l1, u_now])
+                        elif model == "PHILLIPS":
+                            X = np.column_stack([np.ones(L), pi_l1, x_l1, u_now])
+                        elif model == "TAYLORX":
+                            X = np.column_stack([np.ones(L), pi_l1, x_l1, rr_l1])
+                        elif model == "FULL":
+                            X = np.column_stack([np.ones(L), pi_l1, pi_l2, x_l1, u_now, rr_l1])
+                        else:
+                            raise ValueError(model)
+
+                        coef_cache[key] = _ols_fit(X, y_train, ridge=ridge)
+
+                    coef = coef_cache[key]
+                    fc = _recursive_h_step_forecast_linear(
+                        coef=coef,
+                        model=model,
+                        h=h,
+                        pi_t=pi_t,
+                        pi_tm1=pi_tm1,
+                        x_tm1=x_tm1,
+                        u_t=u_t,
+                        rr_tm1=rr_tm1
+                    )
+
+                if fc is None:
                     continue
 
-                # linear models: rolling OLS
-                model = pars["model"]
-                win = int(pars["window"])
-                ridge = float(pars["ridge"])
+                # Optional bias/noise to create a more discriminating panel.
+                if forecaster_bias_std > 0 and ftype != "oracle":
+                    fc = fc + forecaster_bias[j] + regime_loading[j] * (float(regime[t]) - 1.0)
+                if forecaster_noise_std > 0 and ftype != "oracle":
+                    fc = fc + rng.normal(0.0, forecaster_noise_std * np.sqrt(float(h)))
 
-                if t < max(win, 5) + 2:
-                    continue
-                start = max(0, t - win)
-                # train to predict pi_{τ} for τ in (start+2,...,t) using lags aligned
-                # Build arrays for τ = start+2,...,t:
-                # y = pi_τ
-                # pi_{τ-1}, pi_{τ-2}, x_{τ-1}, u_τ, rr_{τ-1}
-                y_train = pi[start+2:t+1]
-                pi_l1 = pi[start+1:t]
-                pi_l2 = pi[start:t-1]
-                x_l1 = x[start+1:t]
-                u_now = u[start+2:t+1]
-                rr_l1 = (i_rate[start+1:t] - pi[start+1:t])
-
-                L = len(y_train)
-                if L < 20:
-                    continue
-
-                key = (t, model, win, ridge)
-                if key not in coef_cache:
-                    if model == "AR1":
-                        X = np.column_stack([np.ones(L), pi_l1])
-                    elif model == "AR2":
-                        X = np.column_stack([np.ones(L), pi_l1, pi_l2])
-                    elif model == "ARX":
-                        X = np.column_stack([np.ones(L), pi_l1, x_l1])
-                    elif model == "ARX2":
-                        X = np.column_stack([np.ones(L), pi_l1, pi_l2, x_l1])
-                    elif model == "ARU":
-                        X = np.column_stack([np.ones(L), pi_l1, u_now])
-                    elif model == "PHILLIPS":
-                        X = np.column_stack([np.ones(L), pi_l1, x_l1, u_now])
-                    elif model == "TAYLORX":
-                        X = np.column_stack([np.ones(L), pi_l1, x_l1, rr_l1])
-                    elif model == "FULL":
-                        X = np.column_stack([np.ones(L), pi_l1, pi_l2, x_l1, u_now, rr_l1])
-                    else:
-                        raise ValueError(model)
-
-                    coef_cache[key] = _ols_fit(X, y_train, ridge=ridge)
-
-                coef = coef_cache[key]
-                forecast_panel[h][t, j] = _recursive_h_step_forecast_linear(
-                    coef=coef,
-                    model=model,
-                    h=h,
-                    pi_t=pi_t,
-                    pi_tm1=pi_tm1,
-                    x_tm1=x_tm1,
-                    u_t=u_t,
-                    rr_tm1=rr_tm1
-                )
+                forecast_panel[h][t, j] = float(fc)
 
     return forecast_panel, names
 
@@ -478,7 +532,10 @@ def make_environment_and_forecasts(
     horizons: List[int] = [1, 4, 8],
     window: int = 120,
     seed: int = 0,
-    include_oracle: bool = True
+    include_oracle: bool = True,
+    scenario: Literal["baseline", "discriminating"] = "baseline",
+    forecaster_noise_std: Optional[float] = None,
+    forecaster_bias_std: Optional[float] = None,
 ) -> Tuple[Dict[str, np.ndarray], Dict[int, np.ndarray], List[str], np.ndarray]:
     """
     Returns:
@@ -488,10 +545,31 @@ def make_environment_and_forecasts(
       state_uncertainty: series s_t you can feed into lambda_t = kappa * s_t
                          (here: sigma_pi, scaled to mean 1)
     """
-    cfg = _default_config(T=T, seed=seed)
+    if scenario == "baseline":
+        cfg = _default_config(T=T, seed=seed)
+        if forecaster_noise_std is None:
+            forecaster_noise_std = 0.0
+        if forecaster_bias_std is None:
+            forecaster_bias_std = 0.0
+    elif scenario == "discriminating":
+        cfg = _discriminating_config(T=T, seed=seed)
+        if forecaster_noise_std is None:
+            forecaster_noise_std = 0.08
+        if forecaster_bias_std is None:
+            forecaster_bias_std = 0.12
+    else:
+        raise ValueError("scenario must be 'baseline' or 'discriminating'")
+
     data = simulate_macro_environment(cfg)
     forecasts_by_h, names = build_forecaster_panel(
-        data, horizons=horizons, window=window, include_oracle=include_oracle, seed=seed
+        data,
+        horizons=horizons,
+        window=window,
+        include_oracle=include_oracle,
+        seed=seed,
+        forecaster_noise_std=float(forecaster_noise_std),
+        forecaster_bias_std=float(forecaster_bias_std),
+        oracle_params_cfg=cfg,
     )
 
     # uncertainty state: use sigma_pi scaled to mean 1 (so kappa interpretable)

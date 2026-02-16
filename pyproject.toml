@@ -14,6 +14,7 @@ dependencies = [
   "scipy",
   "scikit-learn",
   "statsmodels",
+  "optuna",
 ]
 
 [project.optional-dependencies]

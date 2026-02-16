@@ -37,34 +37,78 @@
 - `plot_policy_diagnostics`
 - `rolling_mean`
 
+### `src.evaluation.optuna_tuning`
+- `TuneResult`
+- `tune_all_methods_optuna`
+- `tune_method_optuna`
+
+## Tuning Setup
+- Scenario: discriminating
+- Tuning seeds: [0, 1, 2, 3]
+- Test seeds: [4, 5, 6, 7, 8, 9]
+- Optuna trials per method: 35
+- Tuning mode: optuna_by_horizon
+
+## Tuned Hyperparameters (by horizon)
+
+### Horizon h=1
+- MWUMVanilla: params={'eta': 0.01580148447850615}, objective_mse=0.9275967740804423
+- MWUMBothKL: params={'eta': 0.015919552043565138, 'kappa': 0.005714357133536371}, objective_mse=0.9276072196891759
+- Median: params={}, objective_mse=0.9351405990174786
+- OGDVanilla: params={'eta': 0.001004380875007612}, objective_mse=0.9363174265651122
+- OGDBoth: params={'eta': 0.001000231236412198, 'kappa': 0.05203263616499159}, objective_mse=0.9363951771480309
+- MWUMConcOnlyKL: params={'kappa': 7.849943290518327}, objective_mse=0.9436778985286702
+- Mean: params={}, objective_mse=0.951494710698005
+- OGDConcOnly: params={'kappa': 7.989067040220606}, objective_mse=1.0591123854559412
+
+### Horizon h=4
+- MWUMConcOnlyKL: params={'kappa': 0.28056807110434306}, objective_mse=2.3110477195341685
+- MWUMBothKL: params={'eta': 2.9821867212394793, 'kappa': 0.5913228643145931}, objective_mse=2.436336792645921
+- OGDBoth: params={'eta': 0.03643044147708752, 'kappa': 0.8840210944332434}, objective_mse=2.5986572663695844
+- OGDVanilla: params={'eta': 0.04449333821791166}, objective_mse=2.617438665876078
+- OGDConcOnly: params={'kappa': 7.973929436896223}, objective_mse=2.741631494002637
+- MWUMVanilla: params={'eta': 0.014568470700968195}, objective_mse=3.208999573430413
+- Median: params={}, objective_mse=3.257653711387143
+- Mean: params={}, objective_mse=3.300878809265483
+
+### Horizon h=8
+- MWUMConcOnlyKL: params={'kappa': 0.39742005940341457}, objective_mse=2.934682642435865
+- MWUMBothKL: params={'eta': 2.900336707567024, 'kappa': 0.6678824415504225}, objective_mse=3.0253191922396407
+- OGDBoth: params={'eta': 0.015110282798066584, 'kappa': 0.7407595779704955}, objective_mse=3.470104023728017
+- OGDVanilla: params={'eta': 0.01529830399119274}, objective_mse=3.4878812727270203
+- OGDConcOnly: params={'kappa': 7.9869664267965925}, objective_mse=4.083511276008283
+- MWUMVanilla: params={'eta': 2.8200403424806297}, objective_mse=4.265079734439067
+- Median: params={}, objective_mse=4.704949890767167
+- Mean: params={}, objective_mse=4.886158056388866
+
 ## Aggregated Results
 
 ### Horizon h=1
-- MWUMVanilla: MSE=0.0970 (std 0.0142), MAE=0.2314, LINEX=0.0512, avg HHI=0.0843
-- MWUMBothKL: MSE=0.0971 (std 0.0144), MAE=0.2310, LINEX=0.0512, avg HHI=0.0559
-- MWUMConcOnlyKL: MSE=0.0971 (std 0.0143), MAE=0.2311, LINEX=0.0512, avg HHI=0.0564
-- OGDBoth: MSE=0.0974 (std 0.0147), MAE=0.2312, LINEX=0.0513, avg HHI=0.0574
-- Median: MSE=0.0974 (std 0.0145), MAE=0.2317, LINEX=0.0514, avg HHI=nan
-- Mean: MSE=0.0977 (std 0.0147), MAE=0.2315, LINEX=0.0516, avg HHI=0.0556
-- OGDVanilla: MSE=0.0985 (std 0.0151), MAE=0.2326, LINEX=0.0519, avg HHI=0.0792
-- OGDConcOnly: MSE=0.1077 (std 0.0215), MAE=0.2408, LINEX=0.0561, avg HHI=0.0880
+- MWUMBothKL: MSE=0.8260 (std 0.1223), MAE=0.6170, LINEX=0.7475, avg HHI=0.0676
+- MWUMVanilla: MSE=0.8260 (std 0.1223), MAE=0.6171, LINEX=0.7472, avg HHI=0.0678
+- Median: MSE=0.8316 (std 0.1238), MAE=0.6188, LINEX=0.7407, avg HHI=nan
+- OGDVanilla: MSE=0.8321 (std 0.1238), MAE=0.6218, LINEX=0.7545, avg HHI=0.0603
+- OGDBoth: MSE=0.8321 (std 0.1238), MAE=0.6218, LINEX=0.7544, avg HHI=0.0601
+- MWUMConcOnlyKL: MSE=0.8403 (std 0.1266), MAE=0.6252, LINEX=0.7522, avg HHI=0.0566
+- Mean: MSE=0.8442 (std 0.1273), MAE=0.6329, LINEX=0.7219, avg HHI=0.0556
+- OGDConcOnly: MSE=0.9249 (std 0.1478), MAE=0.6535, LINEX=0.8911, avg HHI=0.0860
 
 ### Horizon h=4
-- OGDConcOnly: MSE=0.2690 (std 0.0717), MAE=0.3736, LINEX=0.1571, avg HHI=0.1312
-- MWUMConcOnlyKL: MSE=0.2772 (std 0.0643), MAE=0.3835, LINEX=0.1638, avg HHI=0.0619
-- OGDBoth: MSE=0.2798 (std 0.0686), MAE=0.3823, LINEX=0.1660, avg HHI=0.0752
-- OGDVanilla: MSE=0.2811 (std 0.0704), MAE=0.3825, LINEX=0.1671, avg HHI=0.1274
-- MWUMVanilla: MSE=0.2980 (std 0.0732), MAE=0.3937, LINEX=0.1791, avg HHI=0.3112
-- MWUMBothKL: MSE=0.3016 (std 0.0725), MAE=0.3989, LINEX=0.1803, avg HHI=0.0577
-- Median: MSE=0.3081 (std 0.0766), MAE=0.4005, LINEX=0.1852, avg HHI=nan
-- Mean: MSE=0.3163 (std 0.0773), MAE=0.4091, LINEX=0.1906, avg HHI=0.0556
+- MWUMConcOnlyKL: MSE=2.0969 (std 0.3979), MAE=0.9977, LINEX=3.4653, avg HHI=0.2957
+- MWUMBothKL: MSE=2.2235 (std 0.4099), MAE=1.0367, LINEX=3.6229, avg HHI=0.1916
+- OGDBoth: MSE=2.2650 (std 0.4327), MAE=1.0521, LINEX=3.5191, avg HHI=0.1672
+- OGDVanilla: MSE=2.2678 (std 0.4420), MAE=1.0529, LINEX=3.5129, avg HHI=0.2298
+- OGDConcOnly: MSE=2.3789 (std 0.5370), MAE=1.0869, LINEX=4.1541, avg HHI=0.1321
+- MWUMVanilla: MSE=2.9936 (std 0.5752), MAE=1.2111, LINEX=7.4537, avg HHI=0.2440
+- Median: MSE=3.0434 (std 0.6486), MAE=1.2203, LINEX=8.6394, avg HHI=nan
+- Mean: MSE=3.0623 (std 0.6386), MAE=1.2447, LINEX=9.1668, avg HHI=0.0556
 
 ### Horizon h=8
-- OGDVanilla: MSE=0.3292 (std 0.0972), MAE=0.4146, LINEX=0.1970, avg HHI=0.1447
-- OGDBoth: MSE=0.3312 (std 0.0980), MAE=0.4180, LINEX=0.1986, avg HHI=0.0857
-- MWUMConcOnlyKL: MSE=0.3411 (std 0.0969), MAE=0.4294, LINEX=0.2038, avg HHI=0.0661
-- OGDConcOnly: MSE=0.3561 (std 0.1191), MAE=0.4339, LINEX=0.2202, avg HHI=0.1563
-- MWUMVanilla: MSE=0.3604 (std 0.1027), MAE=0.4352, LINEX=0.2193, avg HHI=0.4751
-- MWUMBothKL: MSE=0.3772 (std 0.1090), MAE=0.4514, LINEX=0.2273, avg HHI=0.0610
-- Median: MSE=0.4069 (std 0.1279), MAE=0.4642, LINEX=0.2512, avg HHI=nan
-- Mean: MSE=0.4316 (std 0.1365), MAE=0.4834, LINEX=0.2652, avg HHI=0.0556
+- MWUMConcOnlyKL: MSE=2.6249 (std 0.6435), MAE=1.1190, LINEX=5.1589, avg HHI=0.3003
+- MWUMBothKL: MSE=2.6814 (std 0.6293), MAE=1.1399, LINEX=5.2487, avg HHI=0.2327
+- OGDBoth: MSE=2.9933 (std 0.6935), MAE=1.2221, LINEX=6.5905, avg HHI=0.1635
+- OGDVanilla: MSE=3.0040 (std 0.6954), MAE=1.2250, LINEX=6.6408, avg HHI=0.1969
+- OGDConcOnly: MSE=3.2954 (std 0.8867), MAE=1.3060, LINEX=9.4258, avg HHI=0.1664
+- MWUMVanilla: MSE=3.8891 (std 0.8552), MAE=1.3976, LINEX=14.9285, avg HHI=0.9768
+- Median: MSE=4.2037 (std 1.0563), MAE=1.4574, LINEX=19.0906, avg HHI=nan
+- Mean: MSE=4.4315 (std 1.1429), MAE=1.5255, LINEX=22.2751, avg HHI=0.0556
