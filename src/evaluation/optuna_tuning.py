@@ -38,33 +38,62 @@ def _mse(y: np.ndarray, yhat: np.ndarray) -> float:
     return float(np.mean(e * e))
 
 
-def _build_model(method: TunableMethod, params: Optional[Dict[str, float]] = None):
+def _linex(y: np.ndarray, yhat: np.ndarray, a: float) -> float:
+    e = np.asarray(y, dtype=float) - np.asarray(yhat, dtype=float)
+    return float(np.mean(np.exp(a * e) - a * e - 1.0))
+
+
+def _score(y: np.ndarray, yhat: np.ndarray, metric: str, linex_a: float) -> float:
+    if metric == "mse":
+        return _mse(y, yhat)
+    if metric == "linex":
+        return _linex(y, yhat, a=linex_a)
+    raise ValueError("metric must be 'mse' or 'linex'")
+
+
+def _build_model(
+    method: TunableMethod,
+    params: Optional[Dict[str, float]] = None,
+    loss: str = "squared",
+    linex_a: float = 1.0,
+):
     p = {} if params is None else dict(params)
+    loss_name = "linex" if loss == "linex" else "squared"
 
     if method == "Mean":
         return ensemblers.MeanEnsembler()
     if method == "Median":
         return ensemblers.MedianEnsembler()
     if method == "OGDVanilla":
-        return ensemblers.OGDVanilla(eta=float(p.get("eta", 0.05)), loss="squared")
+        return ensemblers.OGDVanilla(eta=float(p.get("eta", 0.05)), loss=loss_name, linex_a=linex_a)
     if method == "MWUMVanilla":
-        return ensemblers.MWUMVanilla(eta=float(p.get("eta", 0.30)), loss="squared")
+        return ensemblers.MWUMVanilla(eta=float(p.get("eta", 0.30)), loss=loss_name, linex_a=linex_a)
     if method == "OGDBoth":
         return ensemblers.OGDConcentrationBoth(
             eta=float(p.get("eta", 0.05)),
             kappa=float(p.get("kappa", 0.80)),
-            loss="squared",
+            loss=loss_name,
+            linex_a=linex_a,
         )
     if method == "OGDConcOnly":
-        return ensemblers.OGDConcentrationOnly(kappa=float(p.get("kappa", 0.80)), loss="squared")
+        return ensemblers.OGDConcentrationOnly(
+            kappa=float(p.get("kappa", 0.80)),
+            loss=loss_name,
+            linex_a=linex_a,
+        )
     if method == "MWUMBothKL":
         return ensemblers.MWUMBothKL(
             eta=float(p.get("eta", 0.30)),
             kappa=float(p.get("kappa", 0.80)),
-            loss="squared",
+            loss=loss_name,
+            linex_a=linex_a,
         )
     if method == "MWUMConcOnlyKL":
-        return ensemblers.MWUMConcentrationOnlyKL(kappa=float(p.get("kappa", 0.80)), loss="squared")
+        return ensemblers.MWUMConcentrationOnlyKL(
+            kappa=float(p.get("kappa", 0.80)),
+            loss=loss_name,
+            linex_a=linex_a,
+        )
 
     raise ValueError(f"Unknown method: {method}")
 
@@ -105,9 +134,12 @@ def tune_method_optuna(
     data_slices: Iterable[DataSlice],
     n_trials: int = 40,
     seed: int = 0,
+    loss: str = "squared",
+    linex_a: float = 1.0,
+    objective_metric: str = "mse",
 ):
     """
-    Tune one method over provided slices using Optuna (minimize mean MSE).
+    Tune one method over provided slices using Optuna.
 
     data_slices: iterable of (y, F, s)
       - y: target series
@@ -128,11 +160,11 @@ def tune_method_optuna(
 
     if method in {"Mean", "Median"}:
         # No tunable hyperparameters.
-        model = _build_model(method, {})
+        model = _build_model(method, {}, loss=loss, linex_a=linex_a)
         losses = []
         for y, F, s in slices:
             res = model.run(F, y, s=s if method in STATE_METHODS else None)
-            losses.append(_mse(y, res.yhat))
+            losses.append(_score(y, res.yhat, metric=objective_metric, linex_a=linex_a))
         best_value = float(np.mean(losses))
         dummy = optuna.create_study(direction="minimize")
         return TuneResult(method=method, best_params={}, best_value=best_value), dummy
@@ -142,12 +174,12 @@ def tune_method_optuna(
 
     def objective(trial):
         params = _suggest_params(trial, method)
-        model = _build_model(method, params)
+        model = _build_model(method, params, loss=loss, linex_a=linex_a)
 
         fold_losses = []
         for y, F, s in slices:
             res = model.run(F, y, s=s if method in STATE_METHODS else None)
-            fold_losses.append(_mse(y, res.yhat))
+            fold_losses.append(_score(y, res.yhat, metric=objective_metric, linex_a=linex_a))
 
         return float(np.mean(fold_losses))
 
@@ -168,6 +200,9 @@ def tune_all_methods_optuna(
     methods: Optional[List[TunableMethod]] = None,
     n_trials: int = 40,
     seed: int = 0,
+    loss: str = "squared",
+    linex_a: float = 1.0,
+    objective_metric: str = "mse",
 ) -> Dict[TunableMethod, TuneResult]:
     """Tune all requested methods and return best params + objective values."""
     if methods is None:
@@ -180,6 +215,9 @@ def tune_all_methods_optuna(
             data_slices=data_slices,
             n_trials=n_trials,
             seed=seed + 17 * i,
+            loss=loss,
+            linex_a=linex_a,
+            objective_metric=objective_metric,
         )
         results[method] = result
 
