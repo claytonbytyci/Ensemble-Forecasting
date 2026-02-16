@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import ast
 import csv
 import math
 import sys
@@ -12,7 +11,7 @@ import numpy as np
 
 from src.data import simulator
 from src.ensemblers import ensemblers
-from src.ensemblers.rl import KappaBandit, RuleSelectionBandit, SoftmaxSimplexBandit
+from src.ensemblers.rl import KappaBandit, RuleSelectionBandit
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EVAL_DIR = PROJECT_ROOT / "src" / "evaluation"
@@ -163,7 +162,6 @@ def evaluate_one_seed(
     linex_a: float,
     params_map_by_h: Dict[int, Dict[str, Dict[str, float]]],
     kappa_grid: np.ndarray,
-    simplex_reg_kappa: float,
 ) -> tuple[List[Dict[str, float]], List[Dict[str, float]]]:
     data, forecasts_by_h, _, s_unc = simulator.make_environment_and_forecasts(
         T=T,
@@ -319,61 +317,6 @@ def evaluate_one_seed(
                 }
             )
 
-        simplex_bandit = SoftmaxSimplexBandit(
-            n_forecasters=F.shape[1],
-            context_dim=x.shape[1],
-            lr=0.03,
-            tau=1.0,
-            loss=rl_loss,
-            linex_a=linex_a,
-            stochastic=False,
-            reg_kappa=simplex_reg_kappa,
-            use_state_as_reg=True,
-            baseline_beta=0.95,
-            seed=seed + 13 * h,
-        )
-        simplex_res = simplex_bandit.run(F=F, y=y, X=x, s=s, warmup=0)
-        rows.append(
-            {
-                "loss_section": loss_section,
-                "seed": float(seed),
-                "horizon": float(h),
-                "method": "RLSimplexBandit",
-                "n_obs": float(y.size),
-                "objective_value": float(obj(y, simplex_res.yhat)),
-                "mse": float(mse(y, simplex_res.yhat)),
-                "mae": float(mae(y, simplex_res.yhat)),
-                "linex": float(linex(y, simplex_res.yhat, a=linex_a)),
-                "avg_hhi": float(avg_hhi(simplex_res.weights)),
-                "avg_lambda": float(avg_finite(simplex_res.meta.get("lambda_t", np.array([math.nan])))),
-                "best_individual_objective": best_obj,
-                "best_individual_mse": best_mse,
-                "best_individual_linex": best_linex,
-                "best_individual_idx": float(best_idx),
-                "diag_main": float(avg_finite(simplex_res.meta.get("kl_t", np.array([math.nan])))),
-                "diag_aux": math.nan,
-            }
-        )
-        kl_t = np.asarray(simplex_res.meta.get("kl_t", np.full(y.size, np.nan)), dtype=float)
-        slambda_t = np.asarray(simplex_res.meta.get("lambda_t", np.full(y.size, np.nan)), dtype=float)
-        valid_idx = np.where(np.isfinite(simplex_res.hhi_t))[0]
-        for t_idx in valid_idx:
-            diag_rows.append(
-                {
-                    "loss_section": loss_section,
-                    "seed": float(seed),
-                    "horizon": float(h),
-                    "method": "RLSimplexBandit",
-                    "t": float(t_idx),
-                    "action_idx": math.nan,
-                    "action_name": "softmax_simplex",
-                    "kappa": math.nan,
-                    "lambda_t": float(slambda_t[t_idx]),
-                    "hhi_t": float(simplex_res.hhi_t[t_idx]),
-                    "kl_t": float(kl_t[t_idx]),
-                }
-            )
-
     return rows, diag_rows
 
 
@@ -427,11 +370,6 @@ def write_csv(path: Path, rows: Iterable[Dict[str, float]]) -> None:
             w.writerow(r)
 
 
-def parse_best_params(raw: str) -> Dict[str, float]:
-    parsed = ast.literal_eval(raw)
-    return {str(k): float(v) for k, v in dict(parsed).items()}
-
-
 def write_report(path: Path, summary_rows: List[Dict[str, float]], tuning_rows: List[Dict[str, float]], linex_a: float) -> None:
     lines: List[str] = []
     lines.append("# Dual-Loss Ensemble + RL Analysis")
@@ -481,7 +419,6 @@ def main() -> None:
     parser.add_argument("--test-seeds", type=int, nargs="+", default=[4, 5, 6, 7, 8, 9])
     parser.add_argument("--n-trials", type=int, default=35)
     parser.add_argument("--linex-a", type=float, default=1.0)
-    parser.add_argument("--simplex-reg-kappa", type=float, default=0.3)
     parser.add_argument("--out-dir", type=str, default="analyses/results")
     args = parser.parse_args()
 
@@ -551,7 +488,6 @@ def main() -> None:
                 linex_a=args.linex_a,
                 params_map_by_h=tuned_by_loss_h[loss_section],
                 kappa_grid=kappa_grid,
-                simplex_reg_kappa=args.simplex_reg_kappa,
             )
             all_rows.extend(rows)
             all_diag_rows.extend(diag_rows)

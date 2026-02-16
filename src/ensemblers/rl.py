@@ -57,16 +57,6 @@ class BanditRunResult:
     meta: Dict[str, np.ndarray]
 
 
-@dataclass
-class SimplexPolicyResult:
-    yhat: np.ndarray
-    weights: np.ndarray
-    loss_t: np.ndarray
-    reward_t: np.ndarray
-    hhi_t: np.ndarray
-    meta: Dict[str, np.ndarray]
-
-
 class _LinUCB:
     def __init__(self, n_actions: int, context_dim: int, alpha: float = 0.5):
         self.n_actions = int(n_actions)
@@ -274,6 +264,13 @@ class RuleSelectionBandit:
 class KappaBandit:
     """
     Contextual bandit that chooses kappa each period for concentration-only MWUM update.
+
+    Timing convention is strictly online:
+      - choose kappa_t from context x_t
+      - predict with current weights w_t
+      - observe y_t and receive reward from prediction loss
+      - update bandit model with (x_t, reward_t)
+      - update weights to w_{t+1} using chosen kappa_t and realised expert losses at t
     """
 
     def __init__(
@@ -302,6 +299,7 @@ class KappaBandit:
             raise ValueError("Need y:(T,), X:(T,d), s:(T,), F:(T,N)")
 
         pi = np.ones(n) / n
+        w = pi.copy()
         yhat = np.full(t, np.nan)
         W = np.full((t, n), np.nan)
         loss_t = np.full(t, np.nan)
@@ -317,12 +315,17 @@ class KappaBandit:
             k = self.bandit.select(X[i])
             kappa = float(self.kappa_grid[k])
             lam = max(1e-6, kappa * float(s[i]))
-            ell = _expert_losses(float(y[i]), F[i], self.loss, self.linex_a)
-            w_i = _softmax(np.log(np.clip(pi, 1e-300, None)) - ell / lam)
+
+            # Predict with current weights (pre-update).
+            w_i = w.copy()
             yhat_i = float(w_i @ F[i])
             l_i = _loss_scalar(float(y[i]), yhat_i, self.loss, self.linex_a)
             r_i = -l_i
             self.bandit.update(k, X[i], r_i)
+
+            # Post-prediction update to next-step weights using realised expert losses.
+            ell = _expert_losses(float(y[i]), F[i], self.loss, self.linex_a)
+            w = _softmax(np.log(np.clip(pi, 1e-300, None)) - ell / lam)
 
             yhat[i] = yhat_i
             W[i] = w_i
@@ -340,214 +343,4 @@ class KappaBandit:
             reward_t=reward_t,
             hhi_t=hhi_t,
             meta={"kappa_t": kappa_t, "actions_t": action_t, "lambda_t": lambda_t},
-        )
-
-
-class SoftmaxSimplexBandit:
-    """
-    Contextual policy on the simplex with optional state-scaled KL regularisation.
-    """
-
-    def __init__(
-        self,
-        n_forecasters: int,
-        context_dim: int,
-        lr: float = 0.05,
-        tau: float = 1.0,
-        loss: LossType = "mse",
-        linex_a: float = 1.0,
-        stochastic: bool = False,
-        reg_kappa: float = 0.0,
-        use_state_as_reg: bool = True,
-        baseline_beta: float = 0.95,
-        seed: int = 0,
-    ):
-        self.n = int(n_forecasters)
-        self.d = int(context_dim)
-        self.lr = float(lr)
-        self.tau = float(tau)
-        self.loss = loss
-        self.linex_a = float(linex_a)
-        self.stochastic = bool(stochastic)
-        self.reg_kappa = float(reg_kappa)
-        self.use_state_as_reg = bool(use_state_as_reg)
-        self.baseline_beta = float(baseline_beta)
-        self.rng = np.random.default_rng(seed)
-        self.theta = 0.01 * self.rng.normal(size=(self.n, self.d))
-        self.baseline = 0.0
-
-    def _choose_weights(self, x_t: np.ndarray) -> np.ndarray:
-        z = self.theta @ x_t
-        if not self.stochastic:
-            return _softmax(z / self.tau)
-        u = self.rng.uniform(1e-12, 1.0, size=self.n)
-        g = -np.log(-np.log(u))
-        return _softmax((z + g) / self.tau)
-
-    def run(self, F: np.ndarray, y: np.ndarray, X: np.ndarray, s: Optional[np.ndarray] = None, warmup: int = 0) -> SimplexPolicyResult:
-        F = np.asarray(F, dtype=float)
-        y = np.asarray(y, dtype=float).reshape(-1)
-        X = np.asarray(X, dtype=float)
-        t, n = F.shape
-        if n != self.n:
-            raise ValueError("F has unexpected number of forecasters")
-        if y.size != t or X.shape != (t, self.d):
-            raise ValueError("Need y:(T,), X:(T,d), F:(T,N)")
-        if s is not None:
-            s = np.asarray(s, dtype=float).reshape(-1)
-            if s.size != t:
-                raise ValueError("s must have length T")
-
-        yhat = np.full(t, np.nan)
-        W = np.full((t, n), np.nan)
-        loss_t = np.full(t, np.nan)
-        reward_t = np.full(t, np.nan)
-        hhi_t = np.full(t, np.nan)
-        kl_t = np.full(t, np.nan)
-        lam_t = np.full(t, np.nan)
-
-        for i in range(t):
-            if not (np.all(np.isfinite(F[i])) and np.isfinite(y[i]) and np.all(np.isfinite(X[i]))):
-                continue
-            w_i = self._choose_weights(X[i])
-            yhat_i = float(w_i @ F[i])
-            l_i = _loss_scalar(float(y[i]), yhat_i, self.loss, self.linex_a)
-
-            lam_i = 0.0
-            if self.reg_kappa > 0.0:
-                if self.use_state_as_reg:
-                    if s is None:
-                        raise ValueError("reg_kappa>0 requires s when use_state_as_reg=True")
-                    lam_i = self.reg_kappa * float(s[i])
-                else:
-                    lam_i = self.reg_kappa
-            kl_i = _kl_to_uniform(w_i) if lam_i > 0.0 else 0.0
-            r_i = -(l_i + lam_i * kl_i)
-
-            yhat[i] = yhat_i
-            W[i] = w_i
-            loss_t[i] = l_i
-            reward_t[i] = r_i
-            hhi_t[i] = _hhi(w_i)
-            kl_t[i] = kl_i
-            lam_t[i] = lam_i
-
-            if i >= warmup:
-                self.baseline = self.baseline_beta * self.baseline + (1.0 - self.baseline_beta) * r_i
-                adv = r_i - self.baseline
-                indiv_loss = _expert_losses(float(y[i]), F[i], self.loss, self.linex_a)
-                temp = max(1e-6, self.tau)
-                q = _softmax(-indiv_loss / temp)
-                z_grad = (w_i - q) / max(1e-6, self.tau)
-                self.theta -= self.lr * adv * np.outer(z_grad, X[i])
-
-        return SimplexPolicyResult(
-            yhat=yhat,
-            weights=W,
-            loss_t=loss_t,
-            reward_t=reward_t,
-            hhi_t=hhi_t,
-            meta={"kl_t": kl_t, "lambda_t": lam_t, "theta": self.theta.copy()},
-        )
-
-
-class DirichletSimplexBandit:
-    def __init__(
-        self,
-        n_forecasters: int,
-        context_dim: int,
-        lr: float = 0.01,
-        alpha0: float = 1.0,
-        loss: LossType = "mse",
-        linex_a: float = 1.0,
-        reg_kappa: float = 0.0,
-        use_state_as_reg: bool = True,
-        baseline_beta: float = 0.95,
-        seed: int = 0,
-    ):
-        self.n = int(n_forecasters)
-        self.d = int(context_dim)
-        self.lr = float(lr)
-        self.alpha0 = float(alpha0)
-        self.loss = loss
-        self.linex_a = float(linex_a)
-        self.reg_kappa = float(reg_kappa)
-        self.use_state_as_reg = bool(use_state_as_reg)
-        self.baseline_beta = float(baseline_beta)
-        self.rng = np.random.default_rng(seed)
-        self.theta = 0.01 * self.rng.normal(size=(self.n, self.d))
-        self.baseline = 0.0
-
-    def run(
-        self,
-        F: np.ndarray,
-        y: np.ndarray,
-        X: np.ndarray,
-        s: Optional[np.ndarray] = None,
-        warmup: int = 0,
-        eps: float = 1e-12,
-    ) -> SimplexPolicyResult:
-        F = np.asarray(F, dtype=float)
-        y = np.asarray(y, dtype=float).reshape(-1)
-        X = np.asarray(X, dtype=float)
-        t, n = F.shape
-        if n != self.n or y.size != t or X.shape != (t, self.d):
-            raise ValueError("Need y:(T,), X:(T,d), F:(T,N)")
-        if s is not None:
-            s = np.asarray(s, dtype=float).reshape(-1)
-            if s.size != t:
-                raise ValueError("s must have length T")
-
-        yhat = np.full(t, np.nan)
-        W = np.full((t, n), np.nan)
-        loss_t = np.full(t, np.nan)
-        reward_t = np.full(t, np.nan)
-        hhi_t = np.full(t, np.nan)
-        kl_t = np.full(t, np.nan)
-        lam_t = np.full(t, np.nan)
-
-        for i in range(t):
-            if not (np.all(np.isfinite(F[i])) and np.isfinite(y[i]) and np.all(np.isfinite(X[i]))):
-                continue
-            logits = self.theta @ X[i]
-            alpha_i = np.exp(logits) + self.alpha0
-            w_i = self.rng.dirichlet(alpha_i)
-            yhat_i = float(w_i @ F[i])
-            l_i = _loss_scalar(float(y[i]), yhat_i, self.loss, self.linex_a)
-
-            lam_i = 0.0
-            if self.reg_kappa > 0.0:
-                if self.use_state_as_reg:
-                    if s is None:
-                        raise ValueError("reg_kappa>0 requires s when use_state_as_reg=True")
-                    lam_i = self.reg_kappa * float(s[i])
-                else:
-                    lam_i = self.reg_kappa
-            kl_i = _kl_to_uniform(w_i) if lam_i > 0.0 else 0.0
-            r_i = -(l_i + lam_i * kl_i)
-
-            yhat[i] = yhat_i
-            W[i] = w_i
-            loss_t[i] = l_i
-            reward_t[i] = r_i
-            hhi_t[i] = _hhi(w_i)
-            kl_t[i] = kl_i
-            lam_t[i] = lam_i
-
-            if i >= warmup:
-                self.baseline = self.baseline_beta * self.baseline + (1.0 - self.baseline_beta) * r_i
-                adv = r_i - self.baseline
-                logw = np.log(np.clip(w_i, eps, 1.0))
-                g_alpha = logw - float(np.mean(logw))
-                exp_logits = np.exp(logits)
-                grad_theta = np.outer(g_alpha * exp_logits, X[i])
-                self.theta += self.lr * adv * grad_theta
-
-        return SimplexPolicyResult(
-            yhat=yhat,
-            weights=W,
-            loss_t=loss_t,
-            reward_t=reward_t,
-            hhi_t=hhi_t,
-            meta={"kl_t": kl_t, "lambda_t": lam_t, "theta": self.theta.copy()},
         )

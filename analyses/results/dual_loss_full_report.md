@@ -35,7 +35,6 @@
 
 ### Summary (Lower Objective Is Better)
 - Horizon 1:
-  - RLKappaBandit: objective=0.3083 (std 0.0588), MSE=0.3083, MAE=0.3027, LINEX=0.2159, avg HHI=0.3330, excess vs best indiv=-0.5482
   - MWUMBothKL: objective=0.8260 (std 0.1223), MSE=0.8260, MAE=0.6170, LINEX=0.7475, avg HHI=0.0676, excess vs best indiv=-0.0305
   - MWUMVanilla: objective=0.8260 (std 0.1223), MSE=0.8260, MAE=0.6171, LINEX=0.7472, avg HHI=0.0678, excess vs best indiv=-0.0304
   - Median: objective=0.8316 (std 0.1238), MSE=0.8316, MAE=0.6188, LINEX=0.7407, avg HHI=nan, excess vs best indiv=-0.0249
@@ -44,12 +43,13 @@
   - MWUMConcOnlyKL: objective=0.8403 (std 0.1266), MSE=0.8403, MAE=0.6252, LINEX=0.7522, avg HHI=0.0566, excess vs best indiv=-0.0162
   - Mean: objective=0.8442 (std 0.1273), MSE=0.8442, MAE=0.6329, LINEX=0.7219, avg HHI=0.0556, excess vs best indiv=-0.0123
   - RLRuleBandit: objective=0.8444 (std 0.1193), MSE=0.8444, MAE=0.6272, LINEX=0.7514, avg HHI=0.0618, excess vs best indiv=-0.0121
+  - RLKappaBandit: objective=0.9097 (std 0.1327), MSE=0.9097, MAE=0.6422, LINEX=0.8987, avg HHI=0.2298, excess vs best indiv=0.0532
   - OGDConcOnly: objective=0.9249 (std 0.1478), MSE=0.9249, MAE=0.6535, LINEX=0.8911, avg HHI=0.0860, excess vs best indiv=0.0685
   - RLSimplexBandit: objective=1.0623 (std 0.4960), MSE=1.0623, MAE=0.6968, LINEX=0.9601, avg HHI=0.4257, excess vs best indiv=0.2058
 - Horizon 4:
-  - RLKappaBandit: objective=1.1242 (std 0.1964), MSE=1.1242, MAE=0.5927, LINEX=1.6986, avg HHI=0.3832, excess vs best indiv=-1.8610
   - MWUMConcOnlyKL: objective=2.0969 (std 0.3979), MSE=2.0969, MAE=0.9977, LINEX=3.4653, avg HHI=0.2957, excess vs best indiv=-0.8883
   - MWUMBothKL: objective=2.2235 (std 0.4099), MSE=2.2235, MAE=1.0367, LINEX=3.6229, avg HHI=0.1916, excess vs best indiv=-0.7617
+  - RLKappaBandit: objective=2.2241 (std 0.4278), MSE=2.2241, MAE=1.0353, LINEX=3.6903, avg HHI=0.3843, excess vs best indiv=-0.7611
   - OGDBoth: objective=2.2650 (std 0.4327), MSE=2.2650, MAE=1.0521, LINEX=3.5191, avg HHI=0.1672, excess vs best indiv=-0.7202
   - OGDVanilla: objective=2.2678 (std 0.4420), MSE=2.2678, MAE=1.0529, LINEX=3.5129, avg HHI=0.2298, excess vs best indiv=-0.7174
   - OGDConcOnly: objective=2.3789 (std 0.5370), MSE=2.3789, MAE=1.0869, LINEX=4.1541, avg HHI=0.1321, excess vs best indiv=-0.6063
@@ -59,9 +59,9 @@
   - Mean: objective=3.0623 (std 0.6386), MSE=3.0623, MAE=1.2447, LINEX=9.1668, avg HHI=0.0556, excess vs best indiv=0.0771
   - RLSimplexBandit: objective=3.2636 (std 0.6767), MSE=3.2636, MAE=1.2814, LINEX=8.3857, avg HHI=0.7558, excess vs best indiv=0.2784
 - Horizon 8:
-  - RLKappaBandit: objective=1.4181 (std 0.3787), MSE=1.4181, MAE=0.6391, LINEX=2.7412, avg HHI=0.5196, excess vs best indiv=-2.4141
   - MWUMConcOnlyKL: objective=2.6249 (std 0.6435), MSE=2.6249, MAE=1.1190, LINEX=5.1589, avg HHI=0.3003, excess vs best indiv=-1.2072
   - MWUMBothKL: objective=2.6814 (std 0.6293), MSE=2.6814, MAE=1.1399, LINEX=5.2487, avg HHI=0.2327, excess vs best indiv=-1.1507
+  - RLKappaBandit: objective=2.7940 (std 0.7234), MSE=2.7940, MAE=1.1640, LINEX=5.8040, avg HHI=0.3782, excess vs best indiv=-1.0381
   - OGDBoth: objective=2.9933 (std 0.6935), MSE=2.9933, MAE=1.2221, LINEX=6.5905, avg HHI=0.1635, excess vs best indiv=-0.8388
   - OGDVanilla: objective=3.0040 (std 0.6954), MSE=3.0040, MAE=1.2250, LINEX=6.6408, avg HHI=0.1969, excess vs best indiv=-0.8281
   - OGDConcOnly: objective=3.2954 (std 0.8867), MSE=3.2954, MAE=1.3060, LINEX=9.4258, avg HHI=0.1664, excess vs best indiv=-0.5367
@@ -104,7 +104,6 @@
 
 ### Summary (Lower Objective Is Better)
 - Horizon 1:
-  - RLKappaBandit: objective=0.2410 (std 0.0947), MSE=0.3782, MAE=0.3642, LINEX=0.2410, avg HHI=0.2310, excess vs best indiv=-0.3936
   - Mean: objective=0.7219 (std 0.1549), MSE=0.8442, MAE=0.6329, LINEX=0.7219, avg HHI=0.0556, excess vs best indiv=0.0873
   - MWUMVanilla: objective=0.7236 (std 0.1430), MSE=0.8325, MAE=0.6242, LINEX=0.7236, avg HHI=0.0580, excess vs best indiv=0.0890
   - MWUMBothKL: objective=0.7286 (std 0.1520), MSE=0.8470, MAE=0.6297, LINEX=0.7286, avg HHI=0.0565, excess vs best indiv=0.0940
@@ -114,12 +113,13 @@
   - Median: objective=0.7407 (std 0.1428), MSE=0.8316, MAE=0.6188, LINEX=0.7407, avg HHI=nan, excess vs best indiv=0.1062
   - RLRuleBandit: objective=0.7466 (std 0.1611), MSE=0.8583, MAE=0.6355, LINEX=0.7466, avg HHI=0.0684, excess vs best indiv=0.1120
   - OGDConcOnly: objective=0.7969 (std 0.1583), MSE=0.8786, MAE=0.6372, LINEX=0.7969, avg HHI=0.0756, excess vs best indiv=0.1623
+  - RLKappaBandit: objective=0.8623 (std 0.1805), MSE=0.8933, MAE=0.6423, LINEX=0.8623, avg HHI=0.1815, excess vs best indiv=0.2277
   - RLSimplexBandit: objective=3.5880 (std 3.4115), MSE=1.8214, MAE=0.9136, LINEX=3.5880, avg HHI=0.5689, excess vs best indiv=2.9535
 - Horizon 4:
-  - RLKappaBandit: objective=1.6484 (std 0.9592), MSE=1.2889, MAE=0.6366, LINEX=1.6484, avg HHI=0.3876, excess vs best indiv=-3.9535
   - OGDVanilla: objective=3.2881 (std 1.9914), MSE=2.5936, MAE=1.1176, LINEX=3.2881, avg HHI=0.2508, excess vs best indiv=-2.3138
   - OGDBoth: objective=3.3022 (std 1.9098), MSE=2.5319, MAE=1.1118, LINEX=3.3022, avg HHI=0.1113, excess vs best indiv=-2.2997
   - MWUMConcOnlyKL: objective=3.3218 (std 1.8684), MSE=2.4805, MAE=1.1088, LINEX=3.3218, avg HHI=0.0973, excess vs best indiv=-2.2801
+  - RLKappaBandit: objective=3.4106 (std 1.9372), MSE=2.2450, MAE=1.0427, LINEX=3.4106, avg HHI=0.2765, excess vs best indiv=-2.1914
   - MWUMBothKL: objective=3.4357 (std 1.8712), MSE=2.5876, MAE=1.1337, LINEX=3.4357, avg HHI=0.0914, excess vs best indiv=-2.1663
   - OGDConcOnly: objective=3.5005 (std 2.0148), MSE=2.4262, MAE=1.0950, LINEX=3.5005, avg HHI=0.1125, excess vs best indiv=-2.1014
   - RLRuleBandit: objective=4.6859 (std 2.5221), MSE=2.8176, MAE=1.1745, LINEX=4.6859, avg HHI=0.2155, excess vs best indiv=-0.9160
@@ -128,11 +128,11 @@
   - RLSimplexBandit: objective=8.9653 (std 4.1319), MSE=3.3958, MAE=1.3013, LINEX=8.9653, avg HHI=0.7817, excess vs best indiv=3.3634
   - Mean: objective=9.1668 (std 6.8162), MSE=3.0623, MAE=1.2447, LINEX=9.1668, avg HHI=0.0556, excess vs best indiv=3.5649
 - Horizon 8:
-  - RLKappaBandit: objective=2.7536 (std 1.9641), MSE=1.6445, MAE=0.7068, LINEX=2.7536, avg HHI=0.4407, excess vs best indiv=-4.4598
   - MWUMConcOnlyKL: objective=4.9678 (std 2.7692), MSE=2.9629, MAE=1.2151, LINEX=4.9678, avg HHI=0.1482, excess vs best indiv=-2.2456
   - MWUMBothKL: objective=5.0742 (std 2.9579), MSE=3.1663, MAE=1.2627, LINEX=5.0742, avg HHI=0.1344, excess vs best indiv=-2.1392
   - OGDBoth: objective=5.1449 (std 2.8465), MSE=3.1401, MAE=1.2431, LINEX=5.1449, avg HHI=0.1691, excess vs best indiv=-2.0685
   - OGDVanilla: objective=5.3811 (std 2.8306), MSE=3.3870, MAE=1.2870, LINEX=5.3811, avg HHI=0.2689, excess vs best indiv=-1.8323
+  - RLKappaBandit: objective=5.4491 (std 2.9321), MSE=2.9618, MAE=1.2030, LINEX=5.4491, avg HHI=0.3143, excess vs best indiv=-1.7643
   - OGDConcOnly: objective=5.9454 (std 3.2663), MSE=3.2298, MAE=1.2903, LINEX=5.9454, avg HHI=0.1387, excess vs best indiv=-1.2679
   - RLRuleBandit: objective=8.0707 (std 4.3518), MSE=3.6037, MAE=1.3383, LINEX=8.0707, avg HHI=0.1689, excess vs best indiv=0.8573
   - MWUMVanilla: objective=9.0167 (std 5.2777), MSE=4.3507, MAE=1.4923, LINEX=9.0167, avg HHI=0.9728, excess vs best indiv=1.8033
