@@ -13,149 +13,145 @@ Forecast combination is often more robust than committing to a single forecaster
 The concentration penalty encodes a conservative prior: under higher uncertainty, keep the portfolio closer to a diversified baseline.
 
 ## 2. Mathematical Setup
-At each time step `t`:
 
-- `N` experts provide forecasts for target `y_t`.
-- A weight vector `w_t` combines forecasts.
-- `w_t` lies on the simplex.
+At each time step $t$:
+
+- $N$ experts provide forecasts for target $y_t$.
+- A weight vector $w_t$ combines forecasts.
+- $w_t$ lies on the simplex.
 
 $$
-\Delta^N = \{w \in \mathbb{R}^N : w_i \ge 0,\ \sum_i w_i = 1\}
+\Delta^N = \{ w \in \mathbb{R}^N : w_i \ge 0,\ \sum_i w_i = 1 \}
 $$
 
 Combined prediction:
 
 $$
-\hat y_t = \sum_{i=1}^N w_{i,t} f_{i,t} = w_t^\top f_t
+\hat{y}_t = \sum_{i=1}^N w_{i,t} f_{i,t} = w_t^\top f_t
 $$
 
 Error:
 
 $$
-e_t = y_t - \hat y_t
+e_t = y_t - \hat{y}_t
 $$
 
+---
+
 ### Losses
-Implemented losses:
 
 Squared loss:
 
 $$
-L_{\text{sq}}(e_t) = e_t^2
+L_{\mathrm{sq}}(e_t) = e_t^2
 $$
 
 LINEX loss:
 
 $$
-L_{\text{linex}}(e_t; a) = \exp(a e_t) - a e_t - 1
+L_{\mathrm{linex}}(e_t; a)
+= \exp(a e_t) - a e_t - 1
 $$
 
 Derivatives used by gradient-based updates:
 
 $$
-\frac{\partial L_{\text{sq}}}{\partial e} = 2e
+\frac{\partial L_{\mathrm{sq}}}{\partial e} = 2e
 $$
 
 $$
-\frac{\partial L_{\text{linex}}}{\partial e} = a\left(\exp(ae) - 1\right)
+\frac{\partial L_{\mathrm{linex}}}{\partial e}
+= a\left(\exp(ae) - 1\right)
 $$
 
-## 3. Core Algorithms (`src/ensemblers/ensemblers.py`)
-The following online ensemblers are implemented.
+---
 
-### 3.1 Baselines
-1. **MeanEnsembler**
-
-$$
-w_{i,t} = \frac{1}{N}
-$$
-
-2. **MedianEnsembler**
-
-$$
-\hat y_t = \operatorname{median}_i(f_{i,t})
-$$
-
-(Nonlinear aggregator; no meaningful simplex weight vector is returned.)
+## 3. Core Algorithms
 
 ### 3.2 OGD Family
-3. **OGDVanilla**
+
+OGDVanilla:
 
 $$
-w_{t+1} = \Pi_\Delta\left(w_t - \eta\nabla_w\ell_t(w_t)\right)
+w_{t+1}
+=
+\Pi_\Delta\left(
+w_t - \eta \nabla_w \ell_t(w_t)
+\right)
 $$
 
 $$
-\ell_t(w_t) = L\left(y_t - w_t^\top f_t\right)
+\ell_t(w_t)
+=
+L\left(y_t - w_t^\top f_t\right)
 $$
 
-4. **OGDConcentrationBoth**
+---
+
+OGDConcentrationBoth:
 
 $$
-w_{t+1} = \arg\min_{w\in\Delta}
-\left\langle \nabla\ell_t(w_t), w \right\rangle
+w_{t+1}
+=
+\arg\min_{w \in \Delta}
+\left\langle \nabla \ell_t(w_t), w \right\rangle
 + \frac{1}{2\eta}\|w-w_t\|_2^2
-+ \lambda_t\|w-\pi\|_2^2
++ \lambda_t \|w-\pi\|_2^2
 $$
 
-5. **OGDConcentrationOnly**
-
-$$
-w_{t+1} = \arg\min_{w\in\Delta}
-\left\langle \nabla\ell_t(w_t), w \right\rangle
-+ \lambda_t\|w-\pi\|_2^2
-$$
+---
 
 ### 3.3 MWUM Family
-6. **MWUMVanilla**
+
 Per-expert losses:
 
 $$
-\ell_{i,t} = L\left(y_t - f_{i,t}\right)
+\ell_{i,t} = L(y_t - f_{i,t})
 $$
 
 Update:
 
 $$
-w_{i,t+1} \propto w_{i,t}\exp\left(-\eta\ell_{i,t}\right)
+w_{i,t+1}
+\propto
+w_{i,t}\exp(-\eta \ell_{i,t})
 $$
 
-7. **MWUMBothKL**
+---
+
+MWUMConcentrationOnlyKL (closed form):
 
 $$
-w_{t+1} = \arg\min_{w\in\Delta}
-\left\langle w,\ell_t \right\rangle
-+ \frac{1}{\eta}\mathrm{KL}(w\|w_t)
-+ \lambda_t\mathrm{KL}(w\|\pi)
+w_i
+\propto
+\pi_i
+\exp\left(
+-\frac{\ell_{i,t}}{\lambda_t}
+\right)
 $$
 
-8. **MWUMConcentrationOnlyKL**
-
-$$
-w_{t+1} = \arg\min_{w\in\Delta}
-\left\langle w,\ell_t \right\rangle
-+ \lambda_t\mathrm{KL}(w\|\pi)
-$$
-
-Closed form:
-
-$$
-w_i \propto \pi_i\exp\left(-\frac{\ell_{i,t}}{\lambda_t}\right)
-$$
+---
 
 ### 3.4 Concentration Schedule
-All concentration-penalized methods use:
 
-1. EMA state smoothing:
-
-$$
-\tilde s_t = \rho\tilde s_{t-1} + (1-\rho)s_t
-$$
-
-2. State-dependent penalty:
+EMA smoothing:
 
 $$
-\lambda_t = \lambda_{\min} + \kappa\log\left(1+\tilde s_t\right)
+\tilde{s}_t
+=
+\rho \tilde{s}_{t-1}
++
+(1-\rho)s_t
+$$
+
+State-dependent penalty:
+
+$$
+\lambda_t
+=
+\lambda_{\min}
++
+\kappa \log(1+\tilde{s}_t)
 $$
 
 Here `s_t` is an uncertainty proxy (in simulations: scaled inflation shock volatility).
@@ -166,15 +162,15 @@ A contextual LinUCB policy selects one weighting rule each period (e.g., Mean, O
 
 - Context `x_t` is built from forecast dispersion/statistics.
 - Action reward is negative forecast loss.
-- Selected action executes one online update step and yields `w_t` and `\hat y_t`.
+- Selected action executes one online update step and yields `w_t` and `y_hat_t`.
 
 ### 4.2 KappaBandit
-A contextual LinUCB policy selects `\kappa_t` from a discrete grid each period for concentration-only MWUM updates.
+A contextual LinUCB policy selects `kappa_t` from a discrete grid each period for concentration-only MWUM updates.
 
-- Chosen `\kappa_t` induces `\lambda_t` via the schedule above.
+- Chosen `kappa_t` induces `lambda_t` via the schedule above.
 - Predict with current weights, observe reward, update bandit, then update portfolio weights.
 
-Both RL modules log diagnostics including chosen actions, rewards, HHI, and (`KappaBandit`) `\kappa_t`, `\lambda_t`, and smoothed state.
+Both RL modules log diagnostics including chosen actions, rewards, HHI, and (`KappaBandit`) `kappa_t`, `lambda_t`, and smoothed state.
 
 ## 5. Simulation Engine (`src/data/simulator.py`)
 The synthetic environment is a regime-switching macro process with stochastic volatility.
