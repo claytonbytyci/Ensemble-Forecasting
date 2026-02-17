@@ -15,47 +15,50 @@ The concentration penalty encodes a conservative prior: under higher uncertainty
 ## 2. Mathematical Setup
 At each time step `t`:
 
-- `N` experts provide forecasts `f[i,t]` for target `y[t]`.
-- A weight vector `w[t]` is used to combine forecasts.
-- `w[t]` lies on the simplex:
+- `N` experts provide forecasts for target `y_t`.
+- A weight vector `w_t` combines forecasts.
+- `w_t` lies on the simplex.
 
-```text
-Delta^N = { w in R^N : w_i >= 0 and sum_i w_i = 1 }
-```
+$$
+\Delta^N = \{w \in \mathbb{R}^N : w_i \ge 0,\ \sum_i w_i = 1\}
+$$
 
 Combined prediction:
 
-```text
-y_hat[t] = sum_i w[i,t] * f[i,t] = dot(w[t], f[t])
-```
+$$
+\hat y_t = \sum_{i=1}^N w_{i,t} f_{i,t} = w_t^\top f_t
+$$
 
 Error:
 
-```text
-e[t] = y[t] - y_hat[t]
-```
+$$
+e_t = y_t - \hat y_t
+$$
 
 ### Losses
 Implemented losses:
 
-- Squared loss:
+Squared loss:
 
-```text
-L_sq(e) = e^2
-```
+$$
+L_{\text{sq}}(e_t) = e_t^2
+$$
 
-- LINEX loss:
+LINEX loss:
 
-```text
-L_linex(e; a) = exp(a*e) - a*e - 1
-```
+$$
+L_{\text{linex}}(e_t; a) = \exp(a e_t) - a e_t - 1
+$$
 
 Derivatives used by gradient-based updates:
 
-```text
-dL_sq/de = 2e
-dL_linex/de = a * (exp(a*e) - 1)
-```
+$$
+\frac{\partial L_{\text{sq}}}{\partial e} = 2e
+$$
+
+$$
+\frac{\partial L_{\text{linex}}}{\partial e} = a\left(\exp(ae) - 1\right)
+$$
 
 ## 3. Core Algorithms (`src/ensemblers/ensemblers.py`)
 The following online ensemblers are implemented.
@@ -63,119 +66,134 @@ The following online ensemblers are implemented.
 ### 3.1 Baselines
 1. **MeanEnsembler**
 
-```text
-w[i,t] = 1/N
-```
+$$
+w_{i,t} = \frac{1}{N}
+$$
 
 2. **MedianEnsembler**
 
-```text
-y_hat[t] = median_i f[i,t]
-```
+$$
+\hat y_t = \operatorname{median}_i(f_{i,t})
+$$
 
 (Nonlinear aggregator; no meaningful simplex weight vector is returned.)
 
 ### 3.2 OGD Family
 3. **OGDVanilla**
 
-```text
-w[t+1] = Proj_Delta( w[t] - eta * grad_w ell_t(w[t]) )
-where ell_t(w[t]) = L( y[t] - dot(w[t], f[t]) )
-```
+$$
+w_{t+1} = \Pi_\Delta\left(w_t - \eta\nabla_w\ell_t(w_t)\right)
+$$
+
+$$
+\ell_t(w_t) = L\left(y_t - w_t^\top f_t\right)
+$$
 
 4. **OGDConcentrationBoth**
 
-```text
-w[t+1] = argmin_{w in Delta}
-         <grad ell_t(w[t]), w>
-         + (1/(2*eta)) * ||w - w[t]||_2^2
-         + lambda[t] * ||w - pi||_2^2
-```
+$$
+w_{t+1} = \arg\min_{w\in\Delta}
+\left\langle \nabla\ell_t(w_t), w \right\rangle
++ \frac{1}{2\eta}\|w-w_t\|_2^2
++ \lambda_t\|w-\pi\|_2^2
+$$
 
 5. **OGDConcentrationOnly**
 
-```text
-w[t+1] = argmin_{w in Delta}
-         <grad ell_t(w[t]), w>
-         + lambda[t] * ||w - pi||_2^2
-```
+$$
+w_{t+1} = \arg\min_{w\in\Delta}
+\left\langle \nabla\ell_t(w_t), w \right\rangle
++ \lambda_t\|w-\pi\|_2^2
+$$
 
 ### 3.3 MWUM Family
 6. **MWUMVanilla**
-Per-expert losses `ell[i,t] = L(y[t] - f[i,t])`:
+Per-expert losses:
 
-```text
-w[i,t+1] proportional to w[i,t] * exp( -eta * ell[i,t] )
-```
+$$
+\ell_{i,t} = L\left(y_t - f_{i,t}\right)
+$$
+
+Update:
+
+$$
+w_{i,t+1} \propto w_{i,t}\exp\left(-\eta\ell_{i,t}\right)
+$$
 
 7. **MWUMBothKL**
 
-```text
-w[t+1] = argmin_{w in Delta}
-         <w, ell_t>
-         + (1/eta) * KL(w || w[t])
-         + lambda[t] * KL(w || pi)
-```
+$$
+w_{t+1} = \arg\min_{w\in\Delta}
+\left\langle w,\ell_t \right\rangle
++ \frac{1}{\eta}\mathrm{KL}(w\|w_t)
++ \lambda_t\mathrm{KL}(w\|\pi)
+$$
 
 8. **MWUMConcentrationOnlyKL**
 
-```text
-w[t+1] = argmin_{w in Delta}
-         <w, ell_t>
-         + lambda[t] * KL(w || pi)
-```
+$$
+w_{t+1} = \arg\min_{w\in\Delta}
+\left\langle w,\ell_t \right\rangle
++ \lambda_t\mathrm{KL}(w\|\pi)
+$$
 
 Closed form:
 
-```text
-w[i] proportional to pi[i] * exp( -ell[i,t] / lambda[t] )
-```
+$$
+w_i \propto \pi_i\exp\left(-\frac{\ell_{i,t}}{\lambda_t}\right)
+$$
 
 ### 3.4 Concentration Schedule
 All concentration-penalized methods use:
 
 1. EMA state smoothing:
 
-```text
-s_ema[t] = rho * s_ema[t-1] + (1-rho) * s[t]
-```
+$$
+\tilde s_t = \rho\tilde s_{t-1} + (1-\rho)s_t
+$$
 
 2. State-dependent penalty:
 
-```text
-lambda[t] = lambda_min + kappa * log(1 + s_ema[t])
-```
+$$
+\lambda_t = \lambda_{\min} + \kappa\log\left(1+\tilde s_t\right)
+$$
 
-Here `s[t]` is an uncertainty proxy (in simulations: scaled inflation shock volatility).
+Here `s_t` is an uncertainty proxy (in simulations: scaled inflation shock volatility).
 
 ## 4. RL Policy Layer (`src/ensemblers/rl.py`)
 ### 4.1 RuleSelectionBandit
 A contextual LinUCB policy selects one weighting rule each period (e.g., Mean, OGD, MWUM, concentration variants).
 
-- Context `x[t]` is built from forecast dispersion/statistics.
+- Context `x_t` is built from forecast dispersion/statistics.
 - Action reward is negative forecast loss.
-- Selected action executes one online update step and yields `w[t]` and `y_hat[t]`.
+- Selected action executes one online update step and yields `w_t` and `\hat y_t`.
 
 ### 4.2 KappaBandit
-A contextual LinUCB policy selects `kappa[t]` from a discrete grid each period for concentration-only MWUM updates.
+A contextual LinUCB policy selects `\kappa_t` from a discrete grid each period for concentration-only MWUM updates.
 
-- Chosen `kappa[t]` induces `lambda[t]` via the schedule above.
+- Chosen `\kappa_t` induces `\lambda_t` via the schedule above.
 - Predict with current weights, observe reward, update bandit, then update portfolio weights.
 
-Both RL modules log diagnostics including chosen actions, rewards, HHI, and (`KappaBandit`) `kappa[t]`, `lambda[t]`, and smoothed state.
+Both RL modules log diagnostics including chosen actions, rewards, HHI, and (`KappaBandit`) `\kappa_t`, `\lambda_t`, and smoothed state.
 
 ## 5. Simulation Engine (`src/data/simulator.py`)
 The synthetic environment is a regime-switching macro process with stochastic volatility.
 
-State variables include inflation `pi[t]`, output gap `x[t]`, policy rate `i[t]`, and supply shock `u[t]`.
+State variables include inflation, output gap, policy rate, and supply shock.
 
-Regime dynamics are Markovian with transition matrix `P`, and equations are regime-dependent (schematic):
+Schematic regime-dependent equations:
 
-```text
-pi[t] = alpha[s]*pi[t-1] + beta[s]*x[t-1] + gamma[s]*u[t] + eps_pi[t]
-x[t]  = rho[s]*x[t-1] - phi[s]*(i[t-1]-pi[t-1]) + eps_x[t]
-i[t]  = psi_pi[s]*pi[t] + psi_x[s]*x[t] + eps_i[t]
-```
+$$
+\pi_t = \alpha_s\pi_{t-1} + \beta_s x_{t-1} + \gamma_s u_t + \varepsilon_t^{\pi}
+$$
+
+$$
+x_t = \rho_s x_{t-1} - \phi_s\left(i_{t-1}-\pi_{t-1}\right) + \varepsilon_t^{x}
+$$
+
+$$
+i_t = \psi_{\pi,s}\pi_t + \psi_{x,s}x_t + \varepsilon_t^{i}
+$$
 
 Two scenarios are provided:
 
