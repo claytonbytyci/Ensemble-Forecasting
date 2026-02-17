@@ -10,155 +10,172 @@ Forecast combination is often more robust than committing to a single forecaster
 - asymmetric loss support (LINEX),
 - contextual bandits that adapt the weighting policy itself.
 
-The concentration penalty is designed to encode a conservative prior: under higher uncertainty, keep the portfolio closer to a diversified baseline.
+The concentration penalty encodes a conservative prior: under higher uncertainty, keep the portfolio closer to a diversified baseline.
 
 ## 2. Mathematical Setup
 At each time step `t`:
 
-- `N` experts provide forecasts `f_{i,t}` for target `y_t`.
-- A weight vector `w_t \in \Delta^N` is used to combine forecasts.
-- `\Delta^N = \{w \in \mathbb{R}^N: w_i \ge 0, \sum_i w_i = 1\}`.
+- `N` experts provide forecasts `f[i,t]` for target `y[t]`.
+- A weight vector `w[t]` is used to combine forecasts.
+- `w[t]` lies on the simplex:
+
+```text
+Delta^N = { w in R^N : w_i >= 0 and sum_i w_i = 1 }
+```
 
 Combined prediction:
 
-$$
-\hat y_t = \sum_{i=1}^N w_{i,t} f_{i,t} = w_t^\top f_t.
-$$
+```text
+y_hat[t] = sum_i w[i,t] * f[i,t] = dot(w[t], f[t])
+```
 
 Error:
 
-$$
-e_t = y_t - \hat y_t.
-$$
+```text
+e[t] = y[t] - y_hat[t]
+```
 
 ### Losses
 Implemented losses:
 
 - Squared loss:
-$$
-L_{\text{sq}}(e_t)=e_t^2.
-$$
+
+```text
+L_sq(e) = e^2
+```
 
 - LINEX loss:
-$$
-L_{\text{linex}}(e_t;a)=\exp(ae_t)-ae_t-1.
-$$
 
-Derivative used by gradient-based updates:
+```text
+L_linex(e; a) = exp(a*e) - a*e - 1
+```
 
-$$
-\frac{\partial L_{\text{sq}}}{\partial e}=2e, \qquad
-\frac{\partial L_{\text{linex}}}{\partial e}=a(\exp(ae)-1).
-$$
+Derivatives used by gradient-based updates:
+
+```text
+dL_sq/de = 2e
+dL_linex/de = a * (exp(a*e) - 1)
+```
 
 ## 3. Core Algorithms (`src/ensemblers/ensemblers.py`)
 The following online ensemblers are implemented.
 
 ### 3.1 Baselines
 1. **MeanEnsembler**
-$$
-w_{i,t}=1/N.
-$$
+
+```text
+w[i,t] = 1/N
+```
 
 2. **MedianEnsembler**
-$$
-\hat y_t = \mathrm{median}_i(f_{i,t}).
-$$
+
+```text
+y_hat[t] = median_i f[i,t]
+```
+
 (Nonlinear aggregator; no meaningful simplex weight vector is returned.)
 
 ### 3.2 OGD Family
 3. **OGDVanilla**
-$$
-w_{t+1}=\Pi_\Delta\big(w_t-\eta\nabla_w \ell_t(w_t)\big),
-$$
-where `\ell_t(w_t)=L(y_t-w_t^\top f_t)`.
+
+```text
+w[t+1] = Proj_Delta( w[t] - eta * grad_w ell_t(w[t]) )
+where ell_t(w[t]) = L( y[t] - dot(w[t], f[t]) )
+```
 
 4. **OGDConcentrationBoth**
-$$
-w_{t+1}=\arg\min_{w\in\Delta}
-\langle \nabla\ell_t(w_t),w\rangle
-+\frac{1}{2\eta}\|w-w_t\|_2^2
-+\lambda_t\|w-\pi\|_2^2.
-$$
+
+```text
+w[t+1] = argmin_{w in Delta}
+         <grad ell_t(w[t]), w>
+         + (1/(2*eta)) * ||w - w[t]||_2^2
+         + lambda[t] * ||w - pi||_2^2
+```
 
 5. **OGDConcentrationOnly**
-$$
-w_{t+1}=\arg\min_{w\in\Delta}
-\langle \nabla\ell_t(w_t),w\rangle
-+\lambda_t\|w-\pi\|_2^2.
-$$
+
+```text
+w[t+1] = argmin_{w in Delta}
+         <grad ell_t(w[t]), w>
+         + lambda[t] * ||w - pi||_2^2
+```
 
 ### 3.3 MWUM Family
 6. **MWUMVanilla**
-Per-expert losses `\ell_{i,t}=L(y_t-f_{i,t})`:
-$$
-w_{i,t+1}\propto w_{i,t}\exp(-\eta\ell_{i,t}).
-$$
+Per-expert losses `ell[i,t] = L(y[t] - f[i,t])`:
+
+```text
+w[i,t+1] proportional to w[i,t] * exp( -eta * ell[i,t] )
+```
 
 7. **MWUMBothKL**
-$$
-w_{t+1}=\arg\min_{w\in\Delta}
-\langle w,\ell_t\rangle+\frac{1}{\eta}\mathrm{KL}(w\|w_t)+\lambda_t\mathrm{KL}(w\|\pi).
-$$
+
+```text
+w[t+1] = argmin_{w in Delta}
+         <w, ell_t>
+         + (1/eta) * KL(w || w[t])
+         + lambda[t] * KL(w || pi)
+```
 
 8. **MWUMConcentrationOnlyKL**
-$$
-w_{t+1}=\arg\min_{w\in\Delta}
-\langle w,\ell_t\rangle+\lambda_t\mathrm{KL}(w\|\pi),
-$$
-with closed form
-$$
-w_i\propto \pi_i\exp\left(-\frac{\ell_{i,t}}{\lambda_t}\right).
-$$
+
+```text
+w[t+1] = argmin_{w in Delta}
+         <w, ell_t>
+         + lambda[t] * KL(w || pi)
+```
+
+Closed form:
+
+```text
+w[i] proportional to pi[i] * exp( -ell[i,t] / lambda[t] )
+```
 
 ### 3.4 Concentration Schedule
 All concentration-penalized methods use:
 
-1. EMA state smoothing
-$$
-\tilde s_t = \rho\tilde s_{t-1} + (1-\rho)s_t
-$$
-with initialization at first observed state.
+1. EMA state smoothing:
 
-2. State-dependent penalty
-$$
-\lambda_t = \lambda_{\min} + \kappa\log(1+\tilde s_t).
-$$
+```text
+s_ema[t] = rho * s_ema[t-1] + (1-rho) * s[t]
+```
 
-Here `s_t` is an uncertainty proxy (in simulations: scaled inflation shock volatility).
+2. State-dependent penalty:
+
+```text
+lambda[t] = lambda_min + kappa * log(1 + s_ema[t])
+```
+
+Here `s[t]` is an uncertainty proxy (in simulations: scaled inflation shock volatility).
 
 ## 4. RL Policy Layer (`src/ensemblers/rl.py`)
 ### 4.1 RuleSelectionBandit
 A contextual LinUCB policy selects one weighting rule each period (e.g., Mean, OGD, MWUM, concentration variants).
 
-- Context `x_t` is constructed from forecast dispersion/statistics.
+- Context `x[t]` is built from forecast dispersion/statistics.
 - Action reward is negative forecast loss.
-- Selected action executes one online update step and yields `w_t` and `\hat y_t`.
+- Selected action executes one online update step and yields `w[t]` and `y_hat[t]`.
 
 ### 4.2 KappaBandit
-A contextual LinUCB policy selects `\kappa_t` from a discrete grid each period for concentration-only MWUM updates.
+A contextual LinUCB policy selects `kappa[t]` from a discrete grid each period for concentration-only MWUM updates.
 
-- Chosen `\kappa_t` induces `\lambda_t` via the same schedule above.
+- Chosen `kappa[t]` induces `lambda[t]` via the schedule above.
 - Predict with current weights, observe reward, update bandit, then update portfolio weights.
 
-Both RL modules log diagnostics including chosen actions, rewards, HHI, and (`KappaBandit`) `\kappa_t`, `\lambda_t`, and smoothed state.
+Both RL modules log diagnostics including chosen actions, rewards, HHI, and (`KappaBandit`) `kappa[t]`, `lambda[t]`, and smoothed state.
 
 ## 5. Simulation Engine (`src/data/simulator.py`)
 The synthetic environment is a regime-switching macro process with stochastic volatility.
 
-State variables include inflation `\pi_t`, output gap `x_t`, policy rate `i_t`, and supply shock `u_t`.
+State variables include inflation `pi[t]`, output gap `x[t]`, policy rate `i[t]`, and supply shock `u[t]`.
 
-Regime dynamics are Markovian with transition matrix `P`, and equations are regime-dependent (schematically):
+Regime dynamics are Markovian with transition matrix `P`, and equations are regime-dependent (schematic):
 
-$$
-\pi_t = \alpha_s\pi_{t-1}+\beta_s x_{t-1}+\gamma_s u_t+\varepsilon^\pi_t,
-$$
-$$
-x_t = \rho_s x_{t-1} - \phi_s(i_{t-1}-\pi_{t-1}) + \varepsilon^x_t,
-$$
-$$
-i_t = \psi_{\pi,s}\pi_t + \psi_{x,s}x_t + \varepsilon^i_t.
-$$
+```text
+pi[t] = alpha[s]*pi[t-1] + beta[s]*x[t-1] + gamma[s]*u[t] + eps_pi[t]
+x[t]  = rho[s]*x[t-1] - phi[s]*(i[t-1]-pi[t-1]) + eps_x[t]
+i[t]  = psi_pi[s]*pi[t] + psi_x[s]*x[t] + eps_i[t]
+```
 
 Two scenarios are provided:
 
