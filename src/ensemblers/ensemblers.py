@@ -17,19 +17,20 @@ Implements exactly the following ensemblers:
 
 (5) OGD + Euclidean concentration (both penalties):
         w_{t+1} = argmin_{w∈Δ} <∇ℓ_t(w_t), w> + (1/(2η))||w-w_t||_2^2 + λ_t||w-π||_2^2
-    with λ_t = κ s_t (state-dependent). Hyperparameters: (η, κ).
+    with λ_t = λ_min + κ log(1 + \tilde s_t), where \tilde s_t is an EMA-smoothed state.
+    Hyperparameters: (η, κ).
 
 (6) OGD concentration-only (no adjustment penalty):
         w_{t+1} = argmin_{w∈Δ} <∇ℓ_t(w_t), w> + λ_t||w-π||_2^2
-    with λ_t = κ s_t. Hyperparameters: κ (and optionally η if you scale the gradient).
+    with the same smoothed λ_t schedule. Hyperparameters: κ.
 
 (7) MWUM + KL concentration (both):
         w_{t+1} = argmin_{w∈Δ} <w, ℓ_t> + (1/η) KL(w||w_t) + λ_t KL(w||π)
-    with λ_t = κ s_t. Hyperparameters: (η, κ).
+    with the same smoothed λ_t schedule. Hyperparameters: (η, κ).
 
 (8) MWUM concentration-only (no adjustment KL):
         w_{t+1} = argmin_{w∈Δ} <w, ℓ_t> + λ_t KL(w||π)
-    with λ_t = κ s_t. Hyperparameters: κ.
+    with the same smoothed λ_t schedule. Hyperparameters: κ.
 
 Notes
 -----
@@ -137,6 +138,38 @@ def _ensure_state(T: int, s: Optional[np.ndarray]) -> Optional[np.ndarray]:
     if s.size != T:
         raise ValueError(f"State series s must have length T={T}, got {s.size}.")
     return s
+
+
+def update_state_ema(prev_state: Optional[float], state_t: float, rho: float) -> float:
+    """
+    One-step EMA state update:
+      s_ema[t] = rho * s_ema[t-1] + (1-rho) * s[t], with s_ema[0] = s[0].
+    """
+    rho = float(rho)
+    if not np.isfinite(rho):
+        raise ValueError("state_smoothing (rho) must be finite.")
+    if not (0.0 <= rho <= 1.0):
+        raise ValueError("state_smoothing (rho) must satisfy 0 <= rho <= 1.")
+    s_now = max(float(state_t), 0.0)
+    if prev_state is None:
+        return s_now
+    if rho == 1.0:
+        return float(prev_state)
+    return rho * float(prev_state) + (1.0 - rho) * s_now
+
+
+def concentration_lambda(kappa: float, state_ema: float, lambda_min: float = 1e-6) -> float:
+    """
+    Shared concentration schedule used across all concentration-penalized methods:
+      lambda_t = lambda_min + kappa * log(1 + state_ema[t]).
+    """
+    kappa = float(kappa)
+    lam_floor = float(lambda_min)
+    if kappa < 0.0:
+        raise ValueError("kappa must be >= 0")
+    if lam_floor < 0.0:
+        raise ValueError("lambda_min must be >= 0")
+    return lam_floor + kappa * float(np.log1p(max(float(state_ema), 0.0)))
 
 
 # -----------------------------
@@ -261,7 +294,7 @@ class OGDConcentrationBoth(BaseEnsembler):
 
     Prox update:
         w_{t+1} = argmin_{w∈Δ} <∇ℓ_t(w_t), w> + (1/(2η))||w-w_t||^2 + λ_t||w-π||^2
-    with λ_t = κ s_t.
+    with λ_t = λ_min + κ log(1 + s_ema,t), where s_ema is EMA-smoothed state.
 
     Hyperparameters: eta, kappa.
     """
@@ -269,6 +302,8 @@ class OGDConcentrationBoth(BaseEnsembler):
     kappa: float = 1.0
     loss: LossName = "squared"
     linex_a: float = 1.0
+    state_smoothing: float = 0.90
+    lambda_min: float = 1e-6
     baseline: Literal["uniform"] | np.ndarray = "uniform"
     w0: Optional[np.ndarray] = None
 
@@ -279,7 +314,7 @@ class OGDConcentrationBoth(BaseEnsembler):
             raise ValueError(f"y must have length T={T}, got {y.size}")
         s = _ensure_state(T, s)
         if s is None:
-            raise ValueError("This ensembler requires a state series s (for λ_t=κ s_t).")
+            raise ValueError("This ensembler requires a state series s for concentration penalty λ_t.")
 
         pi = _baseline_pi(N, self.baseline)
         w = _simplex_projection(pi if self.w0 is None else self.w0)
@@ -293,8 +328,7 @@ class OGDConcentrationBoth(BaseEnsembler):
         kappa = float(self.kappa)
         if eta <= 0:
             raise ValueError("eta must be > 0")
-        if kappa < 0:
-            raise ValueError("kappa must be >= 0")
+        state_ema: Optional[float] = None
 
         for t in range(T):
             f = forecasts[t]
@@ -305,8 +339,8 @@ class OGDConcentrationBoth(BaseEnsembler):
             losses[t] = L
             grad_w = -dLde * f
 
-            lam = kappa * float(s[t])
-            lam = max(lam, 0.0)
+            state_ema = update_state_ema(state_ema, float(s[t]), self.state_smoothing)
+            lam = concentration_lambda(kappa, state_ema, self.lambda_min)
             lambdas[t] = lam
 
             # Unconstrained closed-form (then project)
@@ -325,13 +359,15 @@ class OGDConcentrationOnly(BaseEnsembler):
 
     Prox update:
         w_{t+1} = argmin_{w∈Δ} <∇ℓ_t(w_t), w> + λ_t||w-π||^2
-    with λ_t = κ s_t.
+    with λ_t = λ_min + κ log(1 + s_ema,t), where s_ema is EMA-smoothed state.
 
     Note: as written, there is no explicit η term in the objective. You can think of κ absorbing scaling.
     """
     kappa: float = 1.0
     loss: LossName = "squared"
     linex_a: float = 1.0
+    state_smoothing: float = 0.90
+    lambda_min: float = 1e-6
     baseline: Literal["uniform"] | np.ndarray = "uniform"
     w0: Optional[np.ndarray] = None
 
@@ -342,7 +378,7 @@ class OGDConcentrationOnly(BaseEnsembler):
             raise ValueError(f"y must have length T={T}, got {y.size}")
         s = _ensure_state(T, s)
         if s is None:
-            raise ValueError("This ensembler requires a state series s (for λ_t=κ s_t).")
+            raise ValueError("This ensembler requires a state series s for concentration penalty λ_t.")
 
         pi = _baseline_pi(N, self.baseline)
         w = _simplex_projection(pi if self.w0 is None else self.w0)
@@ -353,8 +389,7 @@ class OGDConcentrationOnly(BaseEnsembler):
         lambdas = np.zeros(T)
 
         kappa = float(self.kappa)
-        if kappa < 0:
-            raise ValueError("kappa must be >= 0")
+        state_ema: Optional[float] = None
 
         for t in range(T):
             f = forecasts[t]
@@ -365,8 +400,8 @@ class OGDConcentrationOnly(BaseEnsembler):
             losses[t] = L
             grad_w = -dLde * f
 
-            lam = kappa * float(s[t])
-            lam = max(lam, 0.0)
+            state_ema = update_state_ema(state_ema, float(s[t]), self.state_smoothing)
+            lam = concentration_lambda(kappa, state_ema, self.lambda_min)
             lambdas[t] = lam
 
             # Solve unconstrained quadratic+linear:
@@ -444,7 +479,7 @@ class MWUMBothKL(BaseEnsembler):
     """
     MWUM with BOTH:
     - adjustment KL: (1/η) KL(w || w_t)
-    - concentration KL: λ_t KL(w || π), with λ_t=κ s_t
+    - concentration KL: λ_t KL(w || π), with smoothed λ_t schedule
 
     We implement this via the closed-form for the minimizer of:
         min_{w∈Δ} <w, ℓ_t> + (1/η) KL(w||w_t) + λ_t KL(w||π)
@@ -456,6 +491,8 @@ class MWUMBothKL(BaseEnsembler):
     kappa: float = 1.0
     loss: LossName = "squared"
     linex_a: float = 1.0
+    state_smoothing: float = 0.90
+    lambda_min: float = 1e-6
     baseline: Literal["uniform"] | np.ndarray = "uniform"
     w0: Optional[np.ndarray] = None
 
@@ -466,7 +503,7 @@ class MWUMBothKL(BaseEnsembler):
             raise ValueError(f"y must have length T={T}, got {y.size}")
         s = _ensure_state(T, s)
         if s is None:
-            raise ValueError("This ensembler requires a state series s (for λ_t=κ s_t).")
+            raise ValueError("This ensembler requires a state series s for concentration penalty λ_t.")
 
         pi = _baseline_pi(N, self.baseline)
         w = _simplex_projection(pi if self.w0 is None else self.w0)
@@ -480,8 +517,7 @@ class MWUMBothKL(BaseEnsembler):
         kappa = float(self.kappa)
         if eta <= 0:
             raise ValueError("eta must be > 0")
-        if kappa < 0:
-            raise ValueError("kappa must be >= 0")
+        state_ema: Optional[float] = None
 
         for t in range(T):
             f = forecasts[t]
@@ -494,7 +530,8 @@ class MWUMBothKL(BaseEnsembler):
                 ell[i], _ = _loss_and_grad_e(e_i, self.loss, self.linex_a)
             avg_loss[t] = float(w @ ell)
 
-            lam = max(kappa * float(s[t]), 0.0)
+            state_ema = update_state_ema(state_ema, float(s[t]), self.state_smoothing)
+            lam = concentration_lambda(kappa, state_ema, self.lambda_min)
             lambdas[t] = lam
 
             # closed-form combined KL solution
@@ -515,7 +552,7 @@ class MWUMConcentrationOnlyKL(BaseEnsembler):
     """
     MWUM concentration-only (no adjustment KL):
 
-        w_{t+1} = argmin_{w∈Δ} <w, ℓ_t> + λ_t KL(w||π),  λ_t=κ s_t
+        w_{t+1} = argmin_{w∈Δ} <w, ℓ_t> + λ_t KL(w||π), with smoothed λ_t schedule
 
     Closed form (softmax around π):
         w_i ∝ π_i * exp( -ℓ_{i,t} / λ_t )
@@ -526,6 +563,8 @@ class MWUMConcentrationOnlyKL(BaseEnsembler):
     kappa: float = 1.0
     loss: LossName = "squared"
     linex_a: float = 1.0
+    state_smoothing: float = 0.90
+    lambda_min: float = 1e-6
     baseline: Literal["uniform"] | np.ndarray = "uniform"
     w0: Optional[np.ndarray] = None  # unused, but kept for interface symmetry
 
@@ -536,7 +575,7 @@ class MWUMConcentrationOnlyKL(BaseEnsembler):
             raise ValueError(f"y must have length T={T}, got {y.size}")
         s = _ensure_state(T, s)
         if s is None:
-            raise ValueError("This ensembler requires a state series s (for λ_t=κ s_t).")
+            raise ValueError("This ensembler requires a state series s for concentration penalty λ_t.")
 
         pi = _baseline_pi(N, self.baseline)
         w = _simplex_projection(pi)  # start at baseline
@@ -547,8 +586,7 @@ class MWUMConcentrationOnlyKL(BaseEnsembler):
         lambdas = np.zeros(T)
 
         kappa = float(self.kappa)
-        if kappa < 0:
-            raise ValueError("kappa must be >= 0")
+        state_ema: Optional[float] = None
 
         for t in range(T):
             f = forecasts[t]
@@ -562,7 +600,8 @@ class MWUMConcentrationOnlyKL(BaseEnsembler):
 
             avg_loss[t] = float(w @ ell)
 
-            lam = max(kappa * float(s[t]), 0.0)
+            state_ema = update_state_ema(state_ema, float(s[t]), self.state_smoothing)
+            lam = concentration_lambda(kappa, state_ema, self.lambda_min)
             lambdas[t] = lam
 
             if lam == 0.0:

@@ -10,6 +10,8 @@ from src.ensemblers import ensemblers
 
 TunableMethod = str
 DataSlice = Tuple[np.ndarray, np.ndarray, np.ndarray]  # (y, F, s)
+DEFAULT_STATE_SMOOTHING = 0.90
+DEFAULT_LAMBDA_MIN = 1e-6
 
 
 DEFAULT_METHOD_PARAMS: Dict[TunableMethod, Dict[str, float]] = {
@@ -17,10 +19,10 @@ DEFAULT_METHOD_PARAMS: Dict[TunableMethod, Dict[str, float]] = {
     "Median": {},
     "OGDVanilla": {"eta": 0.05},
     "MWUMVanilla": {"eta": 0.30},
-    "OGDBoth": {"eta": 0.05, "kappa": 0.80},
-    "OGDConcOnly": {"kappa": 0.80},
-    "MWUMBothKL": {"eta": 0.30, "kappa": 0.80},
-    "MWUMConcOnlyKL": {"kappa": 0.80},
+    "OGDBoth": {"eta": 0.05, "kappa": 0.80, "state_smoothing": DEFAULT_STATE_SMOOTHING, "lambda_min": DEFAULT_LAMBDA_MIN},
+    "OGDConcOnly": {"kappa": 0.80, "state_smoothing": DEFAULT_STATE_SMOOTHING, "lambda_min": DEFAULT_LAMBDA_MIN},
+    "MWUMBothKL": {"eta": 0.30, "kappa": 0.80, "state_smoothing": DEFAULT_STATE_SMOOTHING, "lambda_min": DEFAULT_LAMBDA_MIN},
+    "MWUMConcOnlyKL": {"kappa": 0.80, "state_smoothing": DEFAULT_STATE_SMOOTHING, "lambda_min": DEFAULT_LAMBDA_MIN},
 }
 
 STATE_METHODS = {"OGDBoth", "OGDConcOnly", "MWUMBothKL", "MWUMConcOnlyKL"}
@@ -74,12 +76,16 @@ def _build_model(
             kappa=float(p.get("kappa", 0.80)),
             loss=loss_name,
             linex_a=linex_a,
+            state_smoothing=float(p.get("state_smoothing", DEFAULT_STATE_SMOOTHING)),
+            lambda_min=float(p.get("lambda_min", DEFAULT_LAMBDA_MIN)),
         )
     if method == "OGDConcOnly":
         return ensemblers.OGDConcentrationOnly(
             kappa=float(p.get("kappa", 0.80)),
             loss=loss_name,
             linex_a=linex_a,
+            state_smoothing=float(p.get("state_smoothing", DEFAULT_STATE_SMOOTHING)),
+            lambda_min=float(p.get("lambda_min", DEFAULT_LAMBDA_MIN)),
         )
     if method == "MWUMBothKL":
         return ensemblers.MWUMBothKL(
@@ -87,12 +93,16 @@ def _build_model(
             kappa=float(p.get("kappa", 0.80)),
             loss=loss_name,
             linex_a=linex_a,
+            state_smoothing=float(p.get("state_smoothing", DEFAULT_STATE_SMOOTHING)),
+            lambda_min=float(p.get("lambda_min", DEFAULT_LAMBDA_MIN)),
         )
     if method == "MWUMConcOnlyKL":
         return ensemblers.MWUMConcentrationOnlyKL(
             kappa=float(p.get("kappa", 0.80)),
             loss=loss_name,
             linex_a=linex_a,
+            state_smoothing=float(p.get("state_smoothing", DEFAULT_STATE_SMOOTHING)),
+            lambda_min=float(p.get("lambda_min", DEFAULT_LAMBDA_MIN)),
         )
 
     raise ValueError(f"Unknown method: {method}")

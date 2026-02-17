@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Literal, Optional
 
 import numpy as np
+from .ensemblers import concentration_lambda, update_state_ema
 
 
 LossType = Literal["mse", "linex"]
@@ -89,6 +90,8 @@ class _OnlineRule:
         kappa: float = 1.0,
         loss: LossType = "mse",
         linex_a: float = 1.0,
+        state_smoothing: float = 0.90,
+        lambda_min: float = 1e-6,
     ):
         self.n = int(n_forecasters)
         self.kind = kind
@@ -96,8 +99,11 @@ class _OnlineRule:
         self.kappa = float(kappa)
         self.loss = loss
         self.linex_a = float(linex_a)
+        self.state_smoothing = float(state_smoothing)
+        self.lambda_min = float(lambda_min)
         self.pi = np.ones(self.n) / self.n
         self.w = self.pi.copy()
+        self.state_ema: Optional[float] = None
 
     def _norm(self, w: np.ndarray) -> np.ndarray:
         w = np.maximum(w, 0.0)
@@ -126,7 +132,8 @@ class _OnlineRule:
         e = float(y_t - w_pred @ f_t)
         grad = -self._dlde(e) * f_t
         ell = _expert_losses(y_t, f_t, self.loss, self.linex_a)
-        lam = max(self.kappa * float(s_t), 0.0)
+        self.state_ema = update_state_ema(self.state_ema, float(s_t), self.state_smoothing)
+        lam = concentration_lambda(self.kappa, self.state_ema, self.lambda_min)
 
         if self.kind == "mean":
             self.w = self.pi.copy()
@@ -184,11 +191,15 @@ class RuleSelectionBandit:
         action_specs: Optional[List[Dict[str, float | str]]] = None,
         loss: LossType = "mse",
         linex_a: float = 1.0,
+        state_smoothing: float = 0.90,
+        lambda_min: float = 1e-6,
     ):
         self.n_forecasters = int(n_forecasters)
         self.context_dim = int(context_dim)
         self.loss = loss
         self.linex_a = float(linex_a)
+        self.state_smoothing = float(state_smoothing)
+        self.lambda_min = float(lambda_min)
         if action_specs is None:
             action_specs = [
                 {"name": "Mean", "kind": "mean"},
@@ -210,6 +221,8 @@ class RuleSelectionBandit:
                     kappa=float(spec.get("kappa", 1.0)),
                     loss=self.loss,
                     linex_a=self.linex_a,
+                    state_smoothing=self.state_smoothing,
+                    lambda_min=self.lambda_min,
                 )
             )
         self.bandit = _LinUCB(len(self.actions), self.context_dim, alpha=alpha)
@@ -264,6 +277,7 @@ class RuleSelectionBandit:
 class KappaBandit:
     """
     Contextual bandit that chooses kappa each period for concentration-only MWUM update.
+    Concentration uses lambda_t = lambda_min + kappa_t * log(1 + s_ema,t).
 
     Timing convention is strictly online:
       - choose kappa_t from context x_t
@@ -280,6 +294,8 @@ class KappaBandit:
         alpha: float = 0.5,
         loss: LossType = "mse",
         linex_a: float = 1.0,
+        state_smoothing: float = 0.90,
+        lambda_min: float = 1e-6,
     ):
         self.kappa_grid = np.asarray(kappa_grid, dtype=float).reshape(-1)
         if self.kappa_grid.size == 0:
@@ -287,6 +303,8 @@ class KappaBandit:
         self.context_dim = int(context_dim)
         self.loss = loss
         self.linex_a = float(linex_a)
+        self.state_smoothing = float(state_smoothing)
+        self.lambda_min = float(lambda_min)
         self.bandit = _LinUCB(self.kappa_grid.size, self.context_dim, alpha=alpha)
 
     def run(self, F: np.ndarray, y: np.ndarray, X: np.ndarray, s: np.ndarray) -> BanditRunResult:
@@ -308,13 +326,16 @@ class KappaBandit:
         kappa_t = np.full(t, np.nan)
         action_t = np.full(t, -1, dtype=int)
         lambda_t = np.full(t, np.nan)
+        s_ema_t = np.full(t, np.nan)
+        state_ema: Optional[float] = None
 
         for i in range(t):
             if not (np.all(np.isfinite(F[i])) and np.isfinite(y[i]) and np.all(np.isfinite(X[i])) and np.isfinite(s[i])):
                 continue
             k = self.bandit.select(X[i])
             kappa = float(self.kappa_grid[k])
-            lam = max(1e-6, kappa * float(s[i]))
+            state_ema = update_state_ema(state_ema, float(s[i]), self.state_smoothing)
+            lam = concentration_lambda(kappa, state_ema, self.lambda_min)
 
             # Predict with current weights (pre-update).
             w_i = w.copy()
@@ -335,6 +356,7 @@ class KappaBandit:
             kappa_t[i] = kappa
             action_t[i] = k
             lambda_t[i] = lam
+            s_ema_t[i] = float(state_ema)
 
         return BanditRunResult(
             yhat=yhat,
@@ -342,5 +364,5 @@ class KappaBandit:
             loss_t=loss_t,
             reward_t=reward_t,
             hhi_t=hhi_t,
-            meta={"kappa_t": kappa_t, "actions_t": action_t, "lambda_t": lambda_t},
+            meta={"kappa_t": kappa_t, "actions_t": action_t, "lambda_t": lambda_t, "state_ema_t": s_ema_t},
         )

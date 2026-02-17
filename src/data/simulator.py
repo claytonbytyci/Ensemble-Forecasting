@@ -542,7 +542,7 @@ def make_environment_and_forecasts(
       data: macro series dict
       forecasts_by_h: dict {h: (T,N)} forecast matrices (with NaNs early/late)
       names: forecaster names (N,)
-      state_uncertainty: series s_t you can feed into lambda_t = kappa * s_t
+      state_uncertainty: series s_t you can feed into your concentration lambda schedule
                          (here: sigma_pi, scaled to mean 1)
     """
     if scenario == "baseline":
