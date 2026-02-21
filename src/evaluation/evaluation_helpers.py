@@ -285,14 +285,23 @@ def evaluate_and_plot(
 def hhi_from_weights(W: np.ndarray) -> np.ndarray:
     """
     W: (T,N) weight matrix. Returns HHI_t = sum_i w_{i,t}^2 for each t.
-    Handles rows with NaNs by returning NaN at that t.
+    Rows are normalized onto the simplex before HHI calculation.
+    Invalid rows (non-finite entries, non-positive row sum, negative weights)
+    return NaN.
     """
     W = np.asarray(W, dtype=float)
     if W.ndim != 2:
         raise ValueError("W must be (T,N)")
-    valid = np.all(np.isfinite(W), axis=1)
+
+    finite = np.all(np.isfinite(W), axis=1)
+    nonneg = np.all(W >= 0.0, axis=1)
+    row_sum = np.sum(W, axis=1)
+    valid = finite & nonneg & (row_sum > 0.0)
+
     hhi = np.full(W.shape[0], np.nan, dtype=float)
-    hhi[valid] = np.sum(W[valid] ** 2, axis=1)
+    if np.any(valid):
+        Wn = W[valid] / row_sum[valid, None]
+        hhi[valid] = np.sum(Wn ** 2, axis=1)
     return hhi
 
 

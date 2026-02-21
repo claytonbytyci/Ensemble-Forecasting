@@ -171,6 +171,9 @@ def build_m3_series_horizon_matrix(
     """
     d = aligned_df.copy()
     d = d.loc[(d["series_id"] == str(series_id)) & (d["horizon"].astype(int) == int(horizon))].copy()
+    # Keep only forecasts whose target period matches origin+horizon exactly.
+    if "horizon_consistent" in d.columns:
+        d = d.loc[d["horizon_consistent"]].copy()
     if require_actual:
         d = d.loc[d["actual"].notna()].copy()
 
