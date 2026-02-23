@@ -24,6 +24,12 @@ from .optuna_tuning import (
     tune_all_methods_optuna,
     tune_method_optuna,
 )
+from .spf_experiment import (
+    aggregate_spf_results,
+    build_spf_state_components,
+    evaluate_spf_horizon_matrix,
+    pca_state_from_components,
+)
 
 __all__ = [
     "DEFAULT_METHOD_PARAMS",
@@ -44,6 +50,10 @@ __all__ = [
     "plot_loss_over_time",
     "plot_policy_diagnostics",
     "rolling_mean",
+    "aggregate_spf_results",
+    "build_spf_state_components",
+    "evaluate_spf_horizon_matrix",
+    "pca_state_from_components",
     "tune_all_methods_optuna",
     "tune_method_optuna",
 ]
