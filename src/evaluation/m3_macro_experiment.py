@@ -68,7 +68,12 @@ def tuned_rule_action_specs(params_map: Dict[str, Dict[str, float]]) -> List[Dic
             "eta": float(params_map["OGDBoth"].get("eta", 0.05)),
             "kappa": float(params_map["OGDBoth"].get("kappa", 0.80)),
         },
-        {"name": "OGDConcOnly", "kind": "ogd_conc", "kappa": float(params_map["OGDConcOnly"].get("kappa", 0.80))},
+        {
+            "name": "OGDConcOnly",
+            "kind": "ogd_conc",
+            "eta": float(params_map["OGDConcOnly"].get("eta", 0.05)),
+            "kappa": float(params_map["OGDConcOnly"].get("kappa", 0.80)),
+        },
         {
             "name": "MWUMBothKL",
             "kind": "mwum_both",
@@ -78,6 +83,7 @@ def tuned_rule_action_specs(params_map: Dict[str, Dict[str, float]]) -> List[Dic
         {
             "name": "MWUMConcOnlyKL",
             "kind": "mwum_conc",
+            "eta": float(params_map["MWUMConcOnlyKL"].get("eta", 0.30)),
             "kappa": float(params_map["MWUMConcOnlyKL"].get("kappa", 0.80)),
         },
     ]
@@ -112,6 +118,7 @@ def build_models(
             lambda_min=float(p["OGDBoth"].get("lambda_min", ot.DEFAULT_LAMBDA_MIN)),
         ),
         "OGDConcOnly": ensemblers.OGDConcentrationOnly(
+            eta=float(p["OGDConcOnly"].get("eta", 0.05)),
             kappa=float(p["OGDConcOnly"].get("kappa", 0.80)),
             loss=ens_loss,
             linex_a=linex_a,
@@ -127,6 +134,7 @@ def build_models(
             lambda_min=float(p["MWUMBothKL"].get("lambda_min", ot.DEFAULT_LAMBDA_MIN)),
         ),
         "MWUMConcOnlyKL": ensemblers.MWUMConcentrationOnlyKL(
+            eta=float(p["MWUMConcOnlyKL"].get("eta", 0.30)),
             kappa=float(p["MWUMConcOnlyKL"].get("kappa", 0.80)),
             loss=ens_loss,
             linex_a=linex_a,

@@ -552,12 +552,22 @@ def build_spf_cpi_panel_with_actuals(
     spf_clean: pd.DataFrame,
     actual_inflation: pd.DataFrame,
     horizons: list[str] | None = None,
+    horizon_offsets: dict[str, int] | None = None,
 ) -> pd.DataFrame:
     """
-    Build long SPF panel with same-quarter realized CPI actuals (Realiz5 path).
+    Build long SPF panel with horizon-aligned Realiz5 actuals.
+
+    Each CPI{h} forecast made in origin_period t is matched against the
+    actual CPI inflation at period t+offset, where offset is:
+      - horizon_offsets[h_name] if provided
+      - otherwise the default SPF convention offset (h-1):
+        CPI1->0, CPI2->1, CPI3->2, CPI4->3
+
+    This allows explicit offset control when the source timing convention
+    differs from the default assumption.
 
     Output columns:
-      ID, origin_period, horizon_name, horizon, forecast, actual
+      ID, origin_period, target_period, horizon_name, horizon, forecast, actual
     """
     d = spf_clean.copy()
     if "period" not in d.columns:
@@ -573,23 +583,31 @@ def build_spf_cpi_panel_with_actuals(
     a = actual_inflation.copy()
     if "period" not in a.columns or "actual_inflation_annualized" not in a.columns:
         raise ValueError("actual_inflation must include 'period' and 'actual_inflation_annualized'.")
-    a["origin_period"] = a["period"].apply(_parse_quarter_period)
-    a = a.dropna(subset=["origin_period", "actual_inflation_annualized"]).copy()
-    a_lookup = a[["origin_period", "actual_inflation_annualized"]].drop_duplicates(subset=["origin_period"], keep="last")
+
+    # Build a Period-indexed Series for fast, type-safe lookup.
+    # Using pd.PeriodIndex directly avoids the dtype=object mismatch that
+    # occurs when using .apply(_parse_quarter_period) then merging.
+    a_periods = pd.PeriodIndex(a["period"], freq="Q")
+    a_vals = pd.to_numeric(a["actual_inflation_annualized"], errors="coerce")
+    a_series = pd.Series(a_vals.values, index=a_periods, name="actual_inflation_annualized")
+    a_series = a_series.dropna()
+    a_series = a_series[~a_series.index.duplicated(keep="last")]
 
     rows: list[pd.DataFrame] = []
     for h_name in use_h:
-        h_num = int(re.sub(r"[^0-9]", "", h_name))
+        h_num = int(re.sub(r"[^0-9]", "", h_name)) - 1  # default: CPI1→0, CPI2→1, CPI3→2, CPI4→3
+        target_offset = int(horizon_offsets[h_name]) if horizon_offsets is not None and h_name in horizon_offsets else h_num
         sub = d[["ID", "origin_period", h_name]].copy()
         sub = sub.rename(columns={h_name: "forecast"})
         sub["horizon_name"] = h_name
         sub["horizon"] = h_num
+        sub["target_period"] = sub["origin_period"] + target_offset
+        # Map actual CPI at the target period (Period-indexed lookup, type-safe).
+        sub["actual"] = sub["target_period"].map(a_series)
         rows.append(sub)
 
     panel = pd.concat(rows, axis=0, ignore_index=True)
     panel["forecast"] = pd.to_numeric(panel["forecast"], errors="coerce")
-    panel = panel.merge(a_lookup, how="left", on="origin_period")
-    panel = panel.rename(columns={"actual_inflation_annualized": "actual"})
     panel = panel.dropna(subset=["ID", "origin_period", "forecast", "actual"]).copy()
     panel = panel.sort_values(["horizon_name", "origin_period", "ID"]).reset_index(drop=True)
     return panel
@@ -684,13 +702,16 @@ def build_spf_horizon_matrix(
         return None
 
     pivot = d.pivot_table(index="origin_period", columns="ID", values="forecast", aggfunc="last")
-    target = d.groupby("origin_period", as_index=True).agg(actual=("actual", "last"))
+    target = d.groupby("origin_period", as_index=True).agg(
+        target_period=("target_period", "last"),
+        actual=("actual", "last"),
+    )
     mat = target.join(pivot, how="left").sort_index().reset_index()
     mat = mat.rename(columns={"origin_period": "date"})
-    method_cols = [c for c in mat.columns if c not in {"date", "actual"}]
+    method_cols = [c for c in mat.columns if c not in {"date", "target_period", "actual"}]
     if len(method_cols) < int(min_forecasters):
         return None
-    mat2 = mat[["date", *method_cols, "actual"]].dropna().copy()
+    mat2 = mat[["date", "target_period", *method_cols, "actual"]].dropna().copy()
     if len(mat2) < int(min_obs):
         return None
 

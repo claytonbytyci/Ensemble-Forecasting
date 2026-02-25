@@ -20,9 +20,9 @@ DEFAULT_METHOD_PARAMS: Dict[TunableMethod, Dict[str, float]] = {
     "OGDVanilla": {"eta": 0.05},
     "MWUMVanilla": {"eta": 0.30},
     "OGDBoth": {"eta": 0.05, "kappa": 0.80, "state_smoothing": DEFAULT_STATE_SMOOTHING, "lambda_min": DEFAULT_LAMBDA_MIN},
-    "OGDConcOnly": {"kappa": 0.80, "state_smoothing": DEFAULT_STATE_SMOOTHING, "lambda_min": DEFAULT_LAMBDA_MIN},
+    "OGDConcOnly": {"eta": 0.05, "kappa": 0.80, "state_smoothing": DEFAULT_STATE_SMOOTHING, "lambda_min": DEFAULT_LAMBDA_MIN},
     "MWUMBothKL": {"eta": 0.30, "kappa": 0.80, "state_smoothing": DEFAULT_STATE_SMOOTHING, "lambda_min": DEFAULT_LAMBDA_MIN},
-    "MWUMConcOnlyKL": {"kappa": 0.80, "state_smoothing": DEFAULT_STATE_SMOOTHING, "lambda_min": DEFAULT_LAMBDA_MIN},
+    "MWUMConcOnlyKL": {"eta": 0.30, "kappa": 0.80, "state_smoothing": DEFAULT_STATE_SMOOTHING, "lambda_min": DEFAULT_LAMBDA_MIN},
 }
 
 STATE_METHODS = {"OGDBoth", "OGDConcOnly", "MWUMBothKL", "MWUMConcOnlyKL"}
@@ -125,7 +125,10 @@ def _suggest_params(trial, method: TunableMethod) -> Dict[str, float]:
         }
 
     if method == "OGDConcOnly":
-        return {"kappa": trial.suggest_float("kappa", 1e-3, 8.0, log=True)}
+        return {
+            "eta": trial.suggest_float("eta", 1e-3, 0.35, log=True),
+            "kappa": trial.suggest_float("kappa", 1e-3, 8.0, log=True),
+        }
 
     if method == "MWUMBothKL":
         return {
@@ -134,7 +137,10 @@ def _suggest_params(trial, method: TunableMethod) -> Dict[str, float]:
         }
 
     if method == "MWUMConcOnlyKL":
-        return {"kappa": trial.suggest_float("kappa", 1e-3, 8.0, log=True)}
+        return {
+            "eta": trial.suggest_float("eta", 1e-3, 3.0, log=True),
+            "kappa": trial.suggest_float("kappa", 1e-3, 8.0, log=True),
+        }
 
     raise ValueError(f"Unknown method: {method}")
 

@@ -358,11 +358,17 @@ class OGDConcentrationOnly(BaseEnsembler):
     OGD with concentration penalty ONLY (no adjustment penalty).
 
     Prox update:
-        w_{t+1} = argmin_{w∈Δ} <∇ℓ_t(w_t), w> + λ_t||w-π||^2
-    with λ_t = λ_min + κ log(1 + s_ema,t), where s_ema is EMA-smoothed state.
+        w_{t+1} = argmin_{w∈Δ} η<∇ℓ_t(w_t), w> + λ_t||w-π||^2
+    ⟺   w_{t+1} = Π_Δ( π - η·∇ℓ_t(w_t) / (2λ_t) )
 
-    Note: as written, there is no explicit η term in the objective. You can think of κ absorbing scaling.
+    with λ_t = λ_min + κ log(1 + s̃_t), where s̃_t is an EMA-smoothed state.
+
+    The step-size η scales the gradient relative to the concentration penalty λ_t.
+    Small η → w stays near π (low HHI).  Large η → w follows the gradient more
+    aggressively (higher HHI).  This ensures the method is comparable to vanilla
+    OGD when both use the same η.  Hyperparameters: (η, κ).
     """
+    eta: float = 0.1
     kappa: float = 1.0
     loss: LossName = "squared"
     linex_a: float = 1.0
@@ -388,7 +394,10 @@ class OGDConcentrationOnly(BaseEnsembler):
         losses = np.zeros(T)
         lambdas = np.zeros(T)
 
+        eta = float(self.eta)
         kappa = float(self.kappa)
+        if eta <= 0:
+            raise ValueError("eta must be > 0")
         state_ema: Optional[float] = None
 
         for t in range(T):
@@ -404,14 +413,14 @@ class OGDConcentrationOnly(BaseEnsembler):
             lam = concentration_lambda(kappa, state_ema, self.lambda_min)
             lambdas[t] = lam
 
-            # Solve unconstrained quadratic+linear:
-            # minimize <grad, w> + lam ||w-pi||^2
-            # FOC: grad + 2 lam (w - pi) = 0 -> w = pi - grad/(2 lam)
-            if lam == 0.0:
-                # no penalty; take a pure "greedy" linear step to boundary: project (-grad) direction
-                w = _simplex_projection(-grad_w)
+            # Solve: min_w η<grad, w> + λ||w-π||²
+            # FOC: η·grad + 2λ(w-π) = 0  →  w = π - η·grad/(2λ)
+            # η scales gradient relative to concentration; ensures comparable step-size
+            # to vanilla OGD.  Degenerate case lam≈0: fall back to η-scaled simplex step.
+            if lam < 1e-12:
+                w = _simplex_projection(w - eta * grad_w)
             else:
-                w_tilde = pi - grad_w / (2.0 * lam)
+                w_tilde = pi - eta * grad_w / (2.0 * lam)
                 w = _simplex_projection(w_tilde)
 
         return EnsembleResult(yhat=yhat, weights=W, meta={"loss": losses, "lambda": lambdas})
@@ -552,14 +561,19 @@ class MWUMConcentrationOnlyKL(BaseEnsembler):
     """
     MWUM concentration-only (no adjustment KL):
 
-        w_{t+1} = argmin_{w∈Δ} <w, ℓ_t> + λ_t KL(w||π), with smoothed λ_t schedule
+        w_{t+1} = argmin_{w∈Δ} <w, ℓ_t> + (λ_t/η) KL(w||π)
 
-    Closed form (softmax around π):
-        w_i ∝ π_i * exp( -ℓ_{i,t} / λ_t )
+    Closed form (temperature-scaled softmax around π):
+        w_i ∝ π_i * exp( -η·ℓ_{i,t} / λ_t )
 
-    As λ_t -> ∞, w -> π (uniform if π uniform).
-    As λ_t -> 0, w concentrates on argmin_i ℓ_{i,t}.
+    Effective temperature is λ_t/η.  As λ_t → ∞ (or η → 0), w → π (uniform).
+    As λ_t → 0 (or η → ∞), w concentrates on argmin_i ℓ_{i,t}.
+
+    The step-size η scales the loss sensitivity relative to the concentration
+    penalty λ_t, making the method directly comparable to MWUMVanilla (same η
+    search range).  Hyperparameters: (η, κ).
     """
+    eta: float = 0.5
     kappa: float = 1.0
     loss: LossName = "squared"
     linex_a: float = 1.0
@@ -585,7 +599,10 @@ class MWUMConcentrationOnlyKL(BaseEnsembler):
         avg_loss = np.zeros(T)
         lambdas = np.zeros(T)
 
+        eta = float(self.eta)
         kappa = float(self.kappa)
+        if eta <= 0:
+            raise ValueError("eta must be > 0")
         state_ema: Optional[float] = None
 
         for t in range(T):
@@ -604,15 +621,14 @@ class MWUMConcentrationOnlyKL(BaseEnsembler):
             lam = concentration_lambda(kappa, state_ema, self.lambda_min)
             lambdas[t] = lam
 
-            if lam == 0.0:
-                # concentrates on argmin loss: put all mass on best expert
-                i_star = int(np.argmin(ell))
-                w = np.zeros(N)
-                w[i_star] = 1.0
+            # Solve min_w η<w,ℓ> + λ KL(w||π) → w_i ∝ π_i exp(-η ℓ_i / λ).
+            # Degenerate case lam≈0 (no concentration): pure MWUM step from π.
+            if lam < 1e-12:
+                logw = np.log(np.clip(pi, 1e-300, None)) - eta * ell
             else:
-                logw = np.log(np.clip(pi, 1e-300, None)) - ell / lam
-                logw -= np.max(logw)
-                w = np.exp(logw)
-                w = w / w.sum()
+                logw = np.log(np.clip(pi, 1e-300, None)) - eta * ell / lam
+            logw -= np.max(logw)
+            w = np.exp(logw)
+            w = w / w.sum()
 
         return EnsembleResult(yhat=yhat, weights=W, meta={"avg_loss": avg_loss, "lambda": lambdas})

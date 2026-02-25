@@ -61,19 +61,31 @@ def pca_state_from_components(
     components: pd.DataFrame,
     feature_cols: List[str] | None = None,
     expanding: bool = True,
-    min_train: int = 12,
+    min_train: int = 6,
 ) -> np.ndarray:
     """
     Convert uncertainty components into a 1D state via first principal component.
     If expanding=True, each t uses PCA loadings fit on rows <= t (online-safe).
+
+    min_train controls the minimum number of rows required before PCA is attempted.
+    For periods with fewer than min_train rows (or all-NaN columns), a single-feature
+    fallback based on disagreement is used so the state is never flat for a long
+    stretch at the start of the sample.
     """
     cols = feature_cols if feature_cols is not None else ["vix_q_mean", "disagreement", "error_vol_recent"]
     x_raw = components[cols].astype(float).to_numpy()
     t, k = x_raw.shape
     state = np.full(t, np.nan, dtype=float)
 
-    # Components are nonnegative uncertainty proxies; log1p stabilizes heavy tails.
+    # Components are nonneg uncertainty proxies; log1p stabilises heavy tails.
     x = np.log1p(np.maximum(x_raw, 0.0))
+
+    # Identify which column is "disagreement" – used as fallback when PCA can't fit.
+    _disagree_col_idx: int | None = None
+    for _ci, _cn in enumerate(cols):
+        if "disagree" in _cn.lower():
+            _disagree_col_idx = _ci
+            break
 
     for i in range(t):
         train = x[: i + 1].copy() if expanding else x.copy()
@@ -82,7 +94,11 @@ def pca_state_from_components(
         # Require enough rows with at least one finite entry.
         row_ok = np.any(np.isfinite(train), axis=1)
         train = train[row_ok]
+
+        # --- Fallback for very early periods: use disagreement alone ---
         if train.shape[0] < max(3, int(min_train)):
+            if _disagree_col_idx is not None and np.isfinite(row[_disagree_col_idx]):
+                state[i] = float(row[_disagree_col_idx])
             continue
 
         # Column-wise median imputation from train only (online-safe).

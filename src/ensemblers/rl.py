@@ -151,10 +151,10 @@ class _OnlineRule:
             self.w = self._project_simplex(w_tilde)
             return w_pred
         if self.kind == "ogd_conc":
-            if lam == 0.0:
-                self.w = self._project_simplex(-grad)
+            if lam < 1e-12:
+                self.w = self._project_simplex(self.w - self.eta * grad)
             else:
-                self.w = self._project_simplex(self.pi - grad / (2.0 * lam))
+                self.w = self._project_simplex(self.pi - self.eta * grad / (2.0 * lam))
             return w_pred
         if self.kind == "mwum_both":
             alpha = 1.0 / (1.0 + self.eta * lam)
@@ -168,12 +168,10 @@ class _OnlineRule:
             self.w = _softmax(logw_new)
             return w_pred
         if self.kind == "mwum_conc":
-            if lam == 0.0:
-                i_star = int(np.argmin(ell))
-                self.w = np.zeros(self.n)
-                self.w[i_star] = 1.0
+            if lam < 1e-12:
+                self.w = _softmax(np.log(np.clip(self.pi, 1e-300, None)) - self.eta * ell)
             else:
-                self.w = _softmax(np.log(np.clip(self.pi, 1e-300, None)) - ell / lam)
+                self.w = _softmax(np.log(np.clip(self.pi, 1e-300, None)) - self.eta * ell / lam)
             return w_pred
         raise ValueError(f"Unknown rule kind: {self.kind}")
 
