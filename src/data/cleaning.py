@@ -96,9 +96,13 @@ def _parse_quarter_period(value: object) -> pd.Period | None:
     m = re.match(r"^(\d{4})[:/-](\d{1,2})$", s)
     if m:
         year = int(m.group(1))
-        month = int(m.group(2))
-        if 1 <= month <= 12:
-            q = ((month - 1) // 3) + 1
+        token = int(m.group(2))
+        # SPF error-stats files often encode quarter as YYYY:01..04.
+        # Treat 1..4 as explicit quarter code; only map >4 as month.
+        if 1 <= token <= 4:
+            return pd.Period(f"{year}Q{token}", freq="Q")
+        if 1 <= token <= 12:
+            q = ((token - 1) // 3) + 1
             return pd.Period(f"{year}Q{q}", freq="Q")
 
     dt = pd.to_datetime(s, errors="coerce")
@@ -118,9 +122,25 @@ def clean_spf_realiz5_actuals(
     """
     d = realiz_df.copy()
     colmap = {str(c).strip(): c for c in d.columns}
-    if realiz_col not in colmap:
-        raise ValueError(f"Column '{realiz_col}' not found in Realiz5 dataset.")
-    real_col = colmap[realiz_col]
+    if realiz_col in colmap:
+        real_col = colmap[realiz_col]
+    else:
+        # Case-insensitive / punctuation-insensitive fallback.
+        target = re.sub(r"[^a-z0-9]", "", realiz_col.lower())
+        normalized = {
+            re.sub(r"[^a-z0-9]", "", str(k).lower()): v
+            for k, v in colmap.items()
+        }
+        if target in normalized:
+            real_col = normalized[target]
+        else:
+            candidates = [v for k, v in normalized.items() if "realiz5" in k or "realization" in k]
+            if not candidates:
+                raise ValueError(
+                    f"Column '{realiz_col}' not found in Realiz5 dataset. "
+                    f"Available columns sample: {list(d.columns)[:12]}"
+                )
+            real_col = candidates[0]
 
     # Infer quarter time from YEAR/QUARTER or DATE/PERIOD-style column.
     if "YEAR" in colmap and "QUARTER" in colmap:
@@ -131,7 +151,10 @@ def clean_spf_realiz5_actuals(
         d = d.loc[mask].copy()
         d["period"] = periods.values
     else:
-        date_candidates = [c for c in d.columns if str(c).strip().upper() in {"DATE", "PERIOD", "TIME"}]
+        date_candidates = [
+            c for c in d.columns
+            if str(c).strip().upper() in {"DATE", "PERIOD", "TIME", "YEARQ", "YQ"}
+        ]
         obs_col = date_candidates[0] if date_candidates else d.columns[0]
         d["period"] = d[obs_col].apply(_parse_quarter_period)
         d = d.loc[d["period"].notna()].copy()
@@ -158,7 +181,9 @@ def realiz5_to_actual_inflation(
     if "time" not in d.columns or "cpi_actual" not in d.columns:
         raise ValueError("cleaned_realiz5 must include columns ['time', 'cpi_actual'].")
 
-    d["time"] = pd.to_datetime(d["time"], errors="coerce")
+    # Accept quarter-like labels (including Period objects) in addition to timestamps.
+    q = d["time"].apply(_parse_quarter_period)
+    d["time"] = pd.PeriodIndex(q, freq="Q").to_timestamp("Q")
     d["cpi_actual"] = pd.to_numeric(d["cpi_actual"], errors="coerce")
     d = d.dropna(subset=["time", "cpi_actual"]).sort_values("time").reset_index(drop=True)
 
@@ -173,6 +198,163 @@ def realiz5_to_actual_inflation(
             "actual_inflation_annualized": 100.0 * (ratio.pow(4) - 1.0),
         }
     ).dropna()
+    return out.reset_index(drop=True)
+
+
+def build_spf_consensus_vs_realizations(
+    spf_df: pd.DataFrame,
+    realiz_df: pd.DataFrame,
+    forecast_col: str = "CPI1",
+    realiz_initial_col: str = "Realiz1",
+    realiz_latest_col: str = "Realiz5",
+) -> pd.DataFrame:
+    """
+    Build a period-matched comparison table with no horizon realignment.
+
+    This is intended for diagnostic plotting of SPF average forecasts against
+    initial and latest realizations in the same survey quarter.
+
+    Output columns:
+      - period (Period[Q])
+      - time (quarter-end Timestamp)
+      - avg_forecast
+      - realiz_initial
+      - realiz_latest
+      - revision (latest - initial)
+    """
+    s = spf_df.copy()
+    if forecast_col not in s.columns:
+        raise ValueError(f"SPF dataframe missing forecast column: {forecast_col}")
+    if "YEAR" not in s.columns or "QUARTER" not in s.columns:
+        raise ValueError("SPF dataframe must include YEAR and QUARTER columns.")
+
+    s["YEAR"] = pd.to_numeric(s["YEAR"], errors="coerce")
+    s["QUARTER"] = pd.to_numeric(s["QUARTER"], errors="coerce")
+    s["forecast"] = pd.to_numeric(s[forecast_col], errors="coerce")
+    s = s.dropna(subset=["YEAR", "QUARTER", "forecast"]).copy()
+    s["period"] = pd.PeriodIndex(
+        [f"{int(y)}Q{int(q)}" for y, q in zip(s["YEAR"], s["QUARTER"])], freq="Q"
+    )
+    fc = (
+        s.groupby("period", as_index=False)
+        .agg(avg_forecast=("forecast", "mean"))
+        .sort_values("period")
+    )
+
+    r = realiz_df.copy()
+    colmap = {str(c).strip().lower(): c for c in r.columns}
+    if "year" in colmap and "quarter" in colmap:
+        yy = pd.to_numeric(r[colmap["year"]], errors="coerce")
+        qq = pd.to_numeric(r[colmap["quarter"]], errors="coerce")
+        mask = yy.notna() & qq.notna()
+        r = r.loc[mask].copy()
+        r["period"] = pd.PeriodIndex(
+            [f"{int(y)}Q{int(q)}" for y, q in zip(yy.loc[mask], qq.loc[mask])], freq="Q"
+        )
+    else:
+        obs_col = r.columns[0]
+        r["period"] = r[obs_col].apply(_parse_quarter_period)
+        r = r.loc[r["period"].notna()].copy()
+
+    normalized = {re.sub(r"[^a-z0-9]", "", str(c).lower()): c for c in r.columns}
+    i_key = re.sub(r"[^a-z0-9]", "", realiz_initial_col.lower())
+    l_key = re.sub(r"[^a-z0-9]", "", realiz_latest_col.lower())
+    if i_key not in normalized or l_key not in normalized:
+        raise ValueError(
+            "Realization columns not found in realiz_df. "
+            f"Requested: {realiz_initial_col}, {realiz_latest_col}. "
+            f"Columns sample: {list(r.columns)[:12]}"
+        )
+    i_col = normalized[i_key]
+    l_col = normalized[l_key]
+    r["realiz_initial"] = pd.to_numeric(r[i_col], errors="coerce")
+    r["realiz_latest"] = pd.to_numeric(r[l_col], errors="coerce")
+    rz = (
+        r[["period", "realiz_initial", "realiz_latest"]]
+        .dropna(subset=["period", "realiz_initial", "realiz_latest"])
+        .drop_duplicates(subset=["period"], keep="last")
+        .sort_values("period")
+    )
+
+    out = fc.merge(rz, on="period", how="inner")
+    if out.empty:
+        raise ValueError("No overlapping periods between SPF forecasts and realizations.")
+    out["revision"] = out["realiz_latest"] - out["realiz_initial"]
+    out["time"] = out["period"].dt.to_timestamp("Q")
+    return out[["period", "time", "avg_forecast", "realiz_initial", "realiz_latest", "revision"]]
+
+
+def clean_spf_error_stats_revision_table(
+    realiz_df: pd.DataFrame,
+    date_col: str = "Date",
+    forecast_col: str = "SPFfor_Step1",
+    realiz_initial_col: str = "Realiz1",
+    realiz_latest_col: str = "Realiz5",
+) -> pd.DataFrame:
+    """
+    Clean the SPF error-statistics table into a directly aligned comparison frame.
+
+    This uses one source table where SPF one-step forecasts and realizations already
+    share the same date key, so no additional horizon realignment is performed.
+
+    Output columns:
+      - Date
+      - DateTime
+      - SPFfor_Step1
+      - Realiz1
+      - Realiz5
+      - Revision
+    """
+    d = realiz_df.copy()
+    colmap = {str(c).strip().lower(): c for c in d.columns}
+
+    def _pick(name: str) -> str:
+        key = re.sub(r"[^a-z0-9]", "", name.lower())
+        normalized = {re.sub(r"[^a-z0-9]", "", str(k).lower()): v for k, v in colmap.items()}
+        if key not in normalized:
+            raise ValueError(
+                f"Column '{name}' not found in SPF error-stats table. "
+                f"Columns sample: {list(d.columns)[:12]}"
+            )
+        return normalized[key]
+
+    date_src = _pick(date_col)
+    fc_src = _pick(forecast_col)
+    r1_src = _pick(realiz_initial_col)
+    r5_src = _pick(realiz_latest_col)
+
+    out = d[[date_src, fc_src, r1_src, r5_src]].copy()
+    out = out.rename(
+        columns={
+            date_src: "Date",
+            fc_src: "SPFfor_Step1",
+            r1_src: "Realiz1",
+            r5_src: "Realiz5",
+        }
+    )
+    out["SPFfor_Step1"] = pd.to_numeric(out["SPFfor_Step1"], errors="coerce")
+    out["Realiz1"] = pd.to_numeric(out["Realiz1"], errors="coerce")
+    out["Realiz5"] = pd.to_numeric(out["Realiz5"], errors="coerce")
+    out = out.dropna(subset=["Date", "SPFfor_Step1", "Realiz1", "Realiz5"]).copy()
+
+    # Date keys are quarterly labels like "1968:04" -> 1968Q4.
+    date_parts = out["Date"].astype(str).str.strip().str.extract(r"^(?P<y>\d{4})[:/-]?(?P<q>\d{1,2})$")
+    if date_parts.isna().all(axis=None):
+        out["DateTime"] = pd.to_datetime(out["Date"], errors="coerce")
+        if out["DateTime"].isna().all():
+            raise ValueError("Could not parse Date column in SPF error-stats table.")
+    else:
+        y = pd.to_numeric(date_parts["y"], errors="coerce")
+        q = pd.to_numeric(date_parts["q"], errors="coerce")
+        valid = y.notna() & q.notna() & q.between(1, 4)
+        out = out.loc[valid].copy()
+        out["DateTime"] = pd.PeriodIndex(
+            [f"{int(yy)}Q{int(qq)}" for yy, qq in zip(y.loc[valid], q.loc[valid])],
+            freq="Q",
+        ).to_timestamp("Q")
+
+    out = out.sort_values("DateTime").drop_duplicates(subset=["DateTime"], keep="last")
+    out["Revision"] = out["Realiz5"] - out["Realiz1"]
     return out.reset_index(drop=True)
 
 
@@ -305,7 +487,9 @@ def cpi_index_to_annualized_change(
     else:
         raise ValueError("Input must include 'cpi_actual' with a time column/index.")
 
-    d["time"] = pd.to_datetime(d["time"], errors="coerce")
+    # Accept quarter labels (including Period objects like 2020Q1) as well as timestamps.
+    q = d["time"].apply(_parse_quarter_period)
+    d["time"] = pd.PeriodIndex(q, freq="Q").to_timestamp("Q")
     d["cpi_actual"] = pd.to_numeric(d["cpi_actual"], errors="coerce")
     d = d.dropna(subset=["time", "cpi_actual"]).sort_values("time").reset_index(drop=True)
 
@@ -368,19 +552,12 @@ def build_spf_cpi_panel_with_actuals(
     spf_clean: pd.DataFrame,
     actual_inflation: pd.DataFrame,
     horizons: list[str] | None = None,
-    target_offset: int = -1,
 ) -> pd.DataFrame:
     """
-    Build long SPF panel aligned to realized CPI inflation by target quarter.
+    Build long SPF panel with same-quarter realized CPI actuals (Realiz5 path).
 
     Output columns:
-      ID, origin_period, target_period, horizon_name, horizon, forecast, actual
-
-    Notes:
-      - For SPF CPI horizons, CPI1 typically refers to the current survey quarter.
-        Therefore, target_period is often origin_period + (horizon - 1), which
-        corresponds to target_offset=-1 (default).
-      - If needed, set target_offset=0 to use origin_period + horizon.
+      ID, origin_period, horizon_name, horizon, forecast, actual
     """
     d = spf_clean.copy()
     if "period" not in d.columns:
@@ -396,9 +573,9 @@ def build_spf_cpi_panel_with_actuals(
     a = actual_inflation.copy()
     if "period" not in a.columns or "actual_inflation_annualized" not in a.columns:
         raise ValueError("actual_inflation must include 'period' and 'actual_inflation_annualized'.")
-    a["target_period"] = a["period"].apply(_parse_quarter_period)
-    a = a.dropna(subset=["target_period", "actual_inflation_annualized"]).copy()
-    a_lookup = a[["target_period", "actual_inflation_annualized"]].drop_duplicates(subset=["target_period"], keep="last")
+    a["origin_period"] = a["period"].apply(_parse_quarter_period)
+    a = a.dropna(subset=["origin_period", "actual_inflation_annualized"]).copy()
+    a_lookup = a[["origin_period", "actual_inflation_annualized"]].drop_duplicates(subset=["origin_period"], keep="last")
 
     rows: list[pd.DataFrame] = []
     for h_name in use_h:
@@ -407,12 +584,11 @@ def build_spf_cpi_panel_with_actuals(
         sub = sub.rename(columns={h_name: "forecast"})
         sub["horizon_name"] = h_name
         sub["horizon"] = h_num
-        sub["target_period"] = sub["origin_period"] + (h_num + int(target_offset))
         rows.append(sub)
 
     panel = pd.concat(rows, axis=0, ignore_index=True)
     panel["forecast"] = pd.to_numeric(panel["forecast"], errors="coerce")
-    panel = panel.merge(a_lookup, how="left", on="target_period")
+    panel = panel.merge(a_lookup, how="left", on="origin_period")
     panel = panel.rename(columns={"actual_inflation_annualized": "actual"})
     panel = panel.dropna(subset=["ID", "origin_period", "forecast", "actual"]).copy()
     panel = panel.sort_values(["horizon_name", "origin_period", "ID"]).reset_index(drop=True)
@@ -425,79 +601,11 @@ def alignment_diagnostics_spf_offsets(
     horizons: list[str] | None = None,
     offsets: list[int] | None = None,
 ) -> pd.DataFrame:
-    """
-    Compare SPF-vs-actual alignment quality across candidate target offsets.
-
-    For each offset and horizon:
-      1) builds aligned panel,
-      2) computes mean consensus error metrics against actuals.
-
-    Returns columns:
-      offset, horizon_name, n_obs, mae_consensus, mse_consensus, corr_consensus
-    """
-    hs = ["CPI1", "CPI2", "CPI3"] if horizons is None else list(horizons)
-    offs = [-2, -1, 0, 1] if offsets is None else list(offsets)
-    rows: list[dict[str, float | int | str]] = []
-
-    for off in offs:
-        panel = build_spf_cpi_panel_with_actuals(
-            spf_clean=spf_clean,
-            actual_inflation=actual_inflation,
-            horizons=hs,
-            target_offset=int(off),
-        )
-        if panel.empty:
-            for h in hs:
-                rows.append(
-                    {
-                        "offset": int(off),
-                        "horizon_name": h,
-                        "n_obs": 0,
-                        "mae_consensus": np.nan,
-                        "mse_consensus": np.nan,
-                        "corr_consensus": np.nan,
-                    }
-                )
-            continue
-
-        g = (
-            panel.groupby(["horizon_name", "target_period"], as_index=False)
-            .agg(consensus=("forecast", "mean"), actual=("actual", "last"))
-            .sort_values(["horizon_name", "target_period"])
-        )
-        for h in hs:
-            d = g.loc[g["horizon_name"] == h].copy()
-            if d.empty:
-                rows.append(
-                    {
-                        "offset": int(off),
-                        "horizon_name": h,
-                        "n_obs": 0,
-                        "mae_consensus": np.nan,
-                        "mse_consensus": np.nan,
-                        "corr_consensus": np.nan,
-                    }
-                )
-                continue
-            e = d["actual"].to_numpy(dtype=float) - d["consensus"].to_numpy(dtype=float)
-            mae_c = float(np.mean(np.abs(e)))
-            mse_c = float(np.mean(e * e))
-            if len(d) >= 2:
-                corr_c = float(np.corrcoef(d["actual"].to_numpy(dtype=float), d["consensus"].to_numpy(dtype=float))[0, 1])
-            else:
-                corr_c = np.nan
-            rows.append(
-                {
-                    "offset": int(off),
-                    "horizon_name": h,
-                    "n_obs": int(len(d)),
-                    "mae_consensus": mae_c,
-                    "mse_consensus": mse_c,
-                    "corr_consensus": corr_c,
-                }
-            )
-
-    return pd.DataFrame(rows)
+    """Alignment offset diagnostics are deprecated; SPF uses same-quarter matching only."""
+    raise ValueError(
+        "alignment_diagnostics_spf_offsets is deprecated. "
+        "Use build_spf_cpi_panel_with_actuals() same-quarter output directly."
+    )
 
 
 def find_optimal_reporting_window(
@@ -576,20 +684,23 @@ def build_spf_horizon_matrix(
         return None
 
     pivot = d.pivot_table(index="origin_period", columns="ID", values="forecast", aggfunc="last")
-    target = d.groupby("origin_period", as_index=True).agg(actual=("actual", "last"), target_period=("target_period", "last"))
+    target = d.groupby("origin_period", as_index=True).agg(actual=("actual", "last"))
     mat = target.join(pivot, how="left").sort_index().reset_index()
-    method_cols = [c for c in mat.columns if c not in {"origin_period", "target_period", "actual"}]
+    mat = mat.rename(columns={"origin_period": "date"})
+    method_cols = [c for c in mat.columns if c not in {"date", "actual"}]
     if len(method_cols) < int(min_forecasters):
         return None
-    mat2 = mat[["origin_period", "target_period", "actual", *method_cols]].dropna().copy()
+    mat2 = mat[["date", *method_cols, "actual"]].dropna().copy()
     if len(mat2) < int(min_obs):
         return None
 
     y = mat2["actual"].to_numpy(dtype=float)
     F = mat2[method_cols].to_numpy(dtype=float)
     disagreement = np.std(F, axis=1)
+    mat_for_eval = mat2.rename(columns={"date": "origin_period"})
     return {
-        "mat": mat2,
+        "mat": mat_for_eval,
+        "mat_clean": mat2,
         "y": y,
         "F": F,
         "forecaster_ids": method_cols,

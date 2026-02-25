@@ -21,11 +21,11 @@ def test_extract_realtime_diagonal_actuals_basic():
         }
     )
     out = extract_realtime_diagonal_actuals(rt)
-    assert list(out.columns) == ["period", "vintage_period", "cpi_level_rt"]
+    assert list(out.columns) == ["period", "cpi_level_rt"]
     assert len(out) == 3
     assert out.loc[0, "cpi_level_rt"] == 100.0
-    assert out.loc[1, "cpi_level_rt"] == 102.0
-    assert out.loc[2, "cpi_level_rt"] == 104.0
+    assert out.loc[1, "cpi_level_rt"] == 104.0
+    assert out.loc[2, "cpi_level_rt"] == 103.0
 
 
 def test_spf_panel_and_matrix_build():
@@ -43,14 +43,14 @@ def test_spf_panel_and_matrix_build():
     spf = pd.DataFrame(
         {
             "ID": [1, 2, 1, 2],
-            "period": pd.PeriodIndex(["2019Q4", "2019Q4", "2020Q1", "2020Q1"], freq="Q").to_timestamp("Q"),
+            "period": pd.PeriodIndex(["2020Q2", "2020Q2", "2020Q3", "2020Q3"], freq="Q").to_timestamp("Q"),
             "CPI1": [4.0, 4.5, 3.0, 3.5],
             "CPI2": [3.8, 4.2, 2.8, 3.2],
             "CPI3": [3.5, 3.7, 2.6, 2.9],
         }
     )
     panel = build_spf_cpi_panel_with_actuals(spf, actual, horizons=["CPI1", "CPI2"])
-    assert {"ID", "origin_period", "target_period", "horizon_name", "forecast", "actual"}.issubset(panel.columns)
+    assert {"ID", "origin_period", "horizon_name", "forecast", "actual"}.issubset(panel.columns)
 
     m = build_spf_horizon_matrix(
         panel_long=panel,

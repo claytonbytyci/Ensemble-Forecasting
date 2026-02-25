@@ -80,7 +80,18 @@ def download_spf_realtime_cpi_actuals(url: str = SPF_CPI_REALTIME_URL) -> pd.Dat
 
 
 def download_spf_realiz5_actuals(url: str = SPF_CPI_REALIZ5_URL) -> pd.DataFrame:
-    """Download SPF CPI error-statistics table containing Realiz5 actuals."""
+    """Download SPF CPI error-statistics source containing Realiz5 actuals."""
+    lower_url = url.lower()
+    if ".csv" in lower_url:
+        return pd.read_csv(url)
+    if ".xls" in lower_url:
+        try:
+            return pd.read_excel(url, engine="xlrd")
+        except ImportError as exc:
+            raise ImportError(
+                "Reading .xls files requires the optional dependency 'xlrd'. "
+                "Install it with `pip install xlrd` (or conda equivalent), then rerun."
+            ) from exc
     return pd.read_excel(url)
 
 
@@ -102,11 +113,11 @@ def load_or_download_spf_realiz5_actuals(
     csv_path: str | Path = DEFAULT_SPF_CPI_REALIZ5_CSV_PATH,
     url: str = SPF_CPI_REALIZ5_URL,
 ) -> pd.DataFrame:
-    """Load cached SPF Realiz5 actuals source CSV, or download workbook and cache as CSV."""
+    """Load cached SPF Realiz5 CSV, or download source and cache as CSV."""
     path = Path(csv_path)
     if path.exists():
         return pd.read_csv(path)
-    df = pd.read_excel(url)
+    df = download_spf_realiz5_actuals(url=url)
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
     return df
