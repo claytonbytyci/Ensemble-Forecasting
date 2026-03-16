@@ -255,7 +255,7 @@ def build_forecaster_panel(
     data: Dict[str, np.ndarray],
     horizons: List[int],
     window: int = 120,
-    include_oracle: bool = True,
+    include_oracle: bool = False,
     seed: int = 0,
     forecaster_noise_std: float = 0.0,
     forecaster_bias_std: float = 0.0,
@@ -532,7 +532,7 @@ def make_environment_and_forecasts(
     horizons: List[int] = [1, 4, 8],
     window: int = 120,
     seed: int = 0,
-    include_oracle: bool = True,
+    include_oracle: bool = False,
     scenario: Literal["baseline", "discriminating"] = "baseline",
     forecaster_noise_std: Optional[float] = None,
     forecaster_bias_std: Optional[float] = None,
@@ -584,7 +584,7 @@ def make_environment_and_forecasts(
 # -----------------------------
 if __name__ == "__main__":
     data, forecasts_by_h, names, s_unc = make_environment_and_forecasts(
-        T=800, horizons=[1, 4, 8], window=150, seed=42, include_oracle=True
+        T=800, horizons=[1, 4, 8], window=150, seed=42, include_oracle=False
     )
     print("Series:", {k: v.shape for k, v in data.items()})
     for h, F in forecasts_by_h.items():
