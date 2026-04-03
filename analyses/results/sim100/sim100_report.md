@@ -1,0 +1,216 @@
+# Dual-Loss Ensemble + RL Analysis
+
+- LINEX parameter `a`: 1.0
+
+## MSE Results
+
+### Tuned Hyperparameters (Regular Methods)
+- Horizon 1:
+  - MWUMBothKL: params={'eta': 0.014187626945931071, 'kappa': 0.03600282826691213} objective=0.9271714870229324
+  - MWUMVanilla: params={'eta': 0.013783816558470288} objective=0.9272279839775619
+  - Median: params={} objective=0.9340880694295579
+  - OGDVanilla: params={'eta': 0.001004380875007612} objective=0.93532546699805
+  - OGDBoth: params={'eta': 0.0010089037878103623, 'kappa': 0.14340181023302656} objective=0.9355025963929027
+  - MWUMConcOnlyKL: params={'eta': 0.04000975920197938, 'kappa': 7.788171024743676} objective=0.9443016286381749
+  - OGDConcOnly: params={'eta': 0.01889879259941431, 'kappa': 7.908550293895121} objective=0.9469512598749436
+  - Mean: params={} objective=0.9508282742933337
+- Horizon 4:
+  - MWUMConcOnlyKL: params={'eta': 2.5332277751016674, 'kappa': 0.25608619358030765} objective=2.311522784364965
+  - MWUMBothKL: params={'eta': 2.99138715807153, 'kappa': 1.102821750702496} objective=2.431739014294856
+  - OGDBoth: params={'eta': 0.03288929935310459, 'kappa': 2.6338496245322305} objective=2.5811956326715024
+  - OGDVanilla: params={'eta': 0.033110894270227446} objective=2.614810380977775
+  - OGDConcOnly: params={'eta': 0.0017461524219968072, 'kappa': 2.672302940624942} objective=2.6683625145544543
+  - MWUMVanilla: params={'eta': 0.01975905899018788} objective=3.2175799227502355
+  - Median: params={} objective=3.263253206160238
+  - Mean: params={} objective=3.3076637738264623
+- Horizon 8:
+  - MWUMConcOnlyKL: params={'eta': 0.2788500263129488, 'kappa': 0.2566672788130432} objective=2.9392786590445903
+  - MWUMBothKL: params={'eta': 2.958728127774368, 'kappa': 1.0504226437089312} objective=3.0407156314546966
+  - OGDBoth: params={'eta': 0.014286069428104169, 'kappa': 0.16207531409816334} objective=3.5638050643010213
+  - OGDVanilla: params={'eta': 0.013709098506762857} objective=3.5662427730061297
+  - OGDConcOnly: params={'eta': 0.003111324209734068, 'kappa': 2.8861943489415576} objective=3.7932315911265784
+  - MWUMVanilla: params={'eta': 2.6029134173667132} objective=4.388585424780673
+  - Median: params={} objective=4.740030592316158
+  - Mean: params={} objective=4.908320973470071
+- Horizon 12:
+  - MWUMConcOnlyKL: params={'eta': 0.00101304054543293, 'kappa': 0.3899850486690072} objective=3.4487659399532635
+  - MWUMBothKL: params={'eta': 2.843430420578867, 'kappa': 1.0142758538843601} objective=3.4731861965214987
+  - OGDVanilla: params={'eta': 0.01827768712294998} objective=3.976229854691315
+  - OGDBoth: params={'eta': 0.01215987631711129, 'kappa': 0.0989663609647008} objective=3.978413019850528
+  - OGDConcOnly: params={'eta': 0.014079560374888169, 'kappa': 4.010979390115764} objective=4.34857388826024
+  - MWUMVanilla: params={'eta': 2.982516071321349} objective=4.587895941197879
+  - Median: params={} objective=5.453022720982241
+  - Mean: params={} objective=5.8001383877876185
+- Horizon 16:
+  - MWUMBothKL: params={'eta': 2.9357362194141925, 'kappa': 1.0888117734596037} objective=3.496513334662559
+  - MWUMConcOnlyKL: params={'eta': 0.09144980051494536, 'kappa': 0.6844309040048098} objective=3.5299935568909127
+  - OGDBoth: params={'eta': 0.012983864331779041, 'kappa': 0.006732091027269829} objective=3.886420629650169
+  - OGDVanilla: params={'eta': 0.013414959603400153} objective=3.8962506741288143
+  - OGDConcOnly: params={'eta': 0.312301621784129, 'kappa': 6.118689835319779} objective=4.548301695532349
+  - MWUMVanilla: params={'eta': 0.018548968572003697} objective=4.734335734463306
+  - Median: params={} objective=5.761274747286253
+  - Mean: params={} objective=6.300688029265904
+
+### Summary (Lower Objective Is Better)
+- Horizon 1:
+  - MWUMBothKL: objective=0.9170 (std 0.1165), MSE=0.9170, MAE=0.6462, LINEX=1.2451, avg HHI=0.0663, excess vs best indiv=-0.0318, improvement vs best indiv=3.35%
+  - MWUMVanilla: objective=0.9171 (std 0.1166), MSE=0.9171, MAE=0.6462, LINEX=1.2438, avg HHI=0.0671, excess vs best indiv=-0.0318, improvement vs best indiv=3.35%
+  - OGDVanilla: objective=0.9231 (std 0.1180), MSE=0.9231, MAE=0.6517, LINEX=1.2361, avg HHI=0.0610, excess vs best indiv=-0.0257, improvement vs best indiv=2.72%
+  - OGDBoth: objective=0.9233 (std 0.1180), MSE=0.9233, MAE=0.6517, LINEX=1.2362, avg HHI=0.0607, excess vs best indiv=-0.0255, improvement vs best indiv=2.70%
+  - Median: objective=0.9244 (std 0.1179), MSE=0.9244, MAE=0.6469, LINEX=1.2240, avg HHI=nan, excess vs best indiv=-0.0245, improvement vs best indiv=2.59%
+  - RLRuleBandit: objective=0.9278 (std 0.1196), MSE=0.9278, MAE=0.6534, LINEX=1.2160, avg HHI=0.0579, excess vs best indiv=-0.0211, improvement vs best indiv=2.24%
+  - MWUMConcOnlyKL: objective=0.9325 (std 0.1209), MSE=0.9325, MAE=0.6538, LINEX=1.2221, avg HHI=0.0563, excess vs best indiv=-0.0164, improvement vs best indiv=1.76%
+  - OGDConcOnly: objective=0.9352 (std 0.1224), MSE=0.9352, MAE=0.6546, LINEX=1.1726, avg HHI=0.0573, excess vs best indiv=-0.0136, improvement vs best indiv=1.48%
+  - Mean: objective=0.9366 (std 0.1206), MSE=0.9366, MAE=0.6614, LINEX=1.1453, avg HHI=0.0556, excess vs best indiv=-0.0123, improvement vs best indiv=1.31%
+  - RLKappaBandit: objective=1.0359 (std 0.1453), MSE=1.0359, MAE=0.6763, LINEX=1.9825, avg HHI=0.2460, excess vs best indiv=0.0871, improvement vs best indiv=-9.07%
+- Horizon 4:
+  - MWUMConcOnlyKL: objective=2.2731 (std 0.3794), MSE=2.2731, MAE=1.0350, LINEX=10.9144, avg HHI=0.2738, excess vs best indiv=-0.9355, improvement vs best indiv=29.04%
+  - RLKappaBandit: objective=2.3810 (std 0.3919), MSE=2.3810, MAE=1.0672, LINEX=14.9005, avg HHI=0.3715, excess vs best indiv=-0.8275, improvement vs best indiv=25.64%
+  - MWUMBothKL: objective=2.3883 (std 0.3857), MSE=2.3883, MAE=1.0726, LINEX=7.7248, avg HHI=0.1735, excess vs best indiv=-0.8203, improvement vs best indiv=25.39%
+  - OGDBoth: objective=2.4765 (std 0.4100), MSE=2.4765, MAE=1.0940, LINEX=11.9830, avg HHI=0.1436, excess vs best indiv=-0.7321, improvement vs best indiv=22.69%
+  - OGDVanilla: objective=2.4992 (std 0.4119), MSE=2.4992, MAE=1.0991, LINEX=12.2287, avg HHI=0.2225, excess vs best indiv=-0.7093, improvement vs best indiv=21.96%
+  - OGDConcOnly: objective=2.5541 (std 0.4311), MSE=2.5541, MAE=1.1280, LINEX=12.8205, avg HHI=0.0871, excess vs best indiv=-0.6545, improvement vs best indiv=20.31%
+  - RLRuleBandit: objective=2.8720 (std 0.5475), MSE=2.8720, MAE=1.1780, LINEX=45.5202, avg HHI=0.1279, excess vs best indiv=-0.3366, improvement vs best indiv=10.57%
+  - MWUMVanilla: objective=3.2096 (std 0.5470), MSE=3.2096, MAE=1.2514, LINEX=22.9761, avg HHI=0.2937, excess vs best indiv=0.0010, improvement vs best indiv=-0.04%
+  - Median: objective=3.2617 (std 0.5663), MSE=3.2617, MAE=1.2652, LINEX=26.0678, avg HHI=nan, excess vs best indiv=0.0532, improvement vs best indiv=-1.62%
+  - Mean: objective=3.2852 (std 0.5559), MSE=3.2852, MAE=1.2934, LINEX=24.3654, avg HHI=0.0556, excess vs best indiv=0.0767, improvement vs best indiv=-2.43%
+- Horizon 8:
+  - MWUMConcOnlyKL: objective=2.9526 (std 0.6298), MSE=2.9526, MAE=1.1670, LINEX=19.1847, avg HHI=0.3138, excess vs best indiv=-1.1890, improvement vs best indiv=28.46%
+  - MWUMBothKL: objective=2.9855 (std 0.6154), MSE=2.9855, MAE=1.1862, LINEX=18.4026, avg HHI=0.2203, excess vs best indiv=-1.1561, improvement vs best indiv=27.58%
+  - RLKappaBandit: objective=3.0961 (std 0.6612), MSE=3.0961, MAE=1.2063, LINEX=19.5091, avg HHI=0.3834, excess vs best indiv=-1.0454, improvement vs best indiv=24.91%
+  - OGDBoth: objective=3.3131 (std 0.6712), MSE=3.3131, MAE=1.2641, LINEX=21.3690, avg HHI=0.1844, excess vs best indiv=-0.8285, improvement vs best indiv=19.58%
+  - OGDVanilla: objective=3.3237 (std 0.6716), MSE=3.3237, MAE=1.2669, LINEX=21.2137, avg HHI=0.1894, excess vs best indiv=-0.8178, improvement vs best indiv=19.31%
+  - OGDConcOnly: objective=3.4992 (std 0.7816), MSE=3.4992, MAE=1.3218, LINEX=24.6957, avg HHI=0.0983, excess vs best indiv=-0.6424, improvement vs best indiv=15.45%
+  - RLRuleBandit: objective=3.7306 (std 0.8938), MSE=3.7306, MAE=1.3375, LINEX=191.7608, avg HHI=0.2060, excess vs best indiv=-0.4109, improvement vs best indiv=9.87%
+  - MWUMVanilla: objective=4.1959 (std 0.9186), MSE=4.1959, MAE=1.4259, LINEX=38.2672, avg HHI=0.9849, excess vs best indiv=0.0543, improvement vs best indiv=-1.35%
+  - Median: objective=4.5246 (std 1.0270), MSE=4.5246, MAE=1.4948, LINEX=313.3949, avg HHI=nan, excess vs best indiv=0.3830, improvement vs best indiv=-9.12%
+  - Mean: objective=4.7355 (std 1.0481), MSE=4.7355, MAE=1.5649, LINEX=410.9961, avg HHI=0.0556, excess vs best indiv=0.5940, improvement vs best indiv=-14.35%
+- Horizon 12:
+  - MWUMBothKL: objective=3.2061 (std 0.7156), MSE=3.2061, MAE=1.2116, LINEX=32.4729, avg HHI=0.2383, excess vs best indiv=-1.1292, improvement vs best indiv=25.47%
+  - MWUMConcOnlyKL: objective=3.2107 (std 0.7408), MSE=3.2107, MAE=1.2086, LINEX=37.1651, avg HHI=0.2733, excess vs best indiv=-1.1246, improvement vs best indiv=25.43%
+  - RLKappaBandit: objective=3.3589 (std 0.7512), MSE=3.3589, MAE=1.2481, LINEX=73667.0243, avg HHI=0.3924, excess vs best indiv=-0.9765, improvement vs best indiv=21.85%
+  - OGDVanilla: objective=3.5946 (std 0.8480), MSE=3.5946, MAE=1.2959, LINEX=1786.6447, avg HHI=0.2047, excess vs best indiv=-0.7407, improvement vs best indiv=16.66%
+  - OGDBoth: objective=3.5978 (std 0.8161), MSE=3.5978, MAE=1.3057, LINEX=71.8569, avg HHI=0.1817, excess vs best indiv=-0.7375, improvement vs best indiv=16.44%
+  - OGDConcOnly: objective=3.9099 (std 0.9611), MSE=3.9099, MAE=1.3901, LINEX=947.8059, avg HHI=0.0914, excess vs best indiv=-0.4254, improvement vs best indiv=9.53%
+  - RLRuleBandit: objective=4.1297 (std 1.0420), MSE=4.1297, MAE=1.3932, LINEX=3065027.2926, avg HHI=0.2624, excess vs best indiv=-0.2056, improvement vs best indiv=4.55%
+  - MWUMVanilla: objective=4.7238 (std 2.7788), MSE=4.7238, MAE=1.4497, LINEX=61.7466, avg HHI=0.9859, excess vs best indiv=0.3884, improvement vs best indiv=-11.36%
+  - Median: objective=4.9674 (std 1.2748), MSE=4.9674, MAE=1.5629, LINEX=1399.9163, avg HHI=nan, excess vs best indiv=0.6321, improvement vs best indiv=-14.38%
+  - Mean: objective=5.3366 (std 1.3342), MSE=5.3366, MAE=1.6608, LINEX=16512.9106, avg HHI=0.0556, excess vs best indiv=1.0013, improvement vs best indiv=-23.06%
+- Horizon 16:
+  - MWUMBothKL: objective=3.3293 (std 0.8883), MSE=3.3293, MAE=1.2101, LINEX=22022566.3030, avg HHI=0.2353, excess vs best indiv=-1.0234, improvement vs best indiv=22.94%
+  - MWUMConcOnlyKL: objective=3.3419 (std 0.8078), MSE=3.3419, MAE=1.2259, LINEX=60745747.2530, avg HHI=0.2137, excess vs best indiv=-1.0108, improvement vs best indiv=22.60%
+  - RLKappaBandit: objective=3.4868 (std 0.7934), MSE=3.4868, MAE=1.2605, LINEX=18632161394102620.0000, avg HHI=0.3731, excess vs best indiv=-0.8660, improvement vs best indiv=19.09%
+  - OGDBoth: objective=3.7197 (std 0.9366), MSE=3.7197, MAE=1.3085, LINEX=602247.9667, avg HHI=0.1888, excess vs best indiv=-0.6331, improvement vs best indiv=14.28%
+  - OGDVanilla: objective=3.7220 (std 0.9425), MSE=3.7220, MAE=1.3080, LINEX=1181604.3023, avg HHI=0.1906, excess vs best indiv=-0.6308, improvement vs best indiv=14.25%
+  - OGDConcOnly: objective=4.1363 (std 1.0790), MSE=4.1363, MAE=1.4169, LINEX=128051609.0824, avg HHI=0.0807, excess vs best indiv=-0.2164, improvement vs best indiv=4.52%
+  - RLRuleBandit: objective=4.2980 (std 1.1572), MSE=4.2980, MAE=1.4138, LINEX=1848263831821.6846, avg HHI=0.1587, excess vs best indiv=-0.0547, improvement vs best indiv=1.20%
+  - MWUMVanilla: objective=4.3895 (std 1.1184), MSE=4.3895, MAE=1.4262, LINEX=247.3370, avg HHI=0.4759, excess vs best indiv=0.0368, improvement vs best indiv=-0.97%
+  - Median: objective=5.0822 (std 1.3996), MSE=5.0822, MAE=1.5788, LINEX=2873.3118, avg HHI=nan, excess vs best indiv=0.7295, improvement vs best indiv=-16.22%
+  - Mean: objective=5.5875 (std 1.4907), MSE=5.5875, MAE=1.6904, LINEX=24994677.9117, avg HHI=0.0556, excess vs best indiv=1.2348, improvement vs best indiv=-28.18%
+
+## LINEX Results
+
+### Tuned Hyperparameters (Regular Methods)
+- Horizon 1:
+  - Mean: params={} objective=1.5353887522221132
+  - MWUMBothKL: params={'eta': 0.0010869466553146418, 'kappa': 7.51011975594033} objective=1.7568333150058975
+  - MWUMConcOnlyKL: params={'eta': 0.04000975920197938, 'kappa': 7.788171024743676} objective=1.8111150145722488
+  - MWUMVanilla: params={'eta': 0.001071380345127959} objective=1.942031992972344
+  - Median: params={} objective=2.132740367416537
+  - OGDConcOnly: params={'eta': 0.01889879259941431, 'kappa': 7.908550293895121} objective=2.1391590985568434
+  - OGDVanilla: params={'eta': 0.0031709028216475085} objective=2.2390864857021597
+  - OGDBoth: params={'eta': 0.0031576228955195983, 'kappa': 0.0024886637247900295} objective=2.239273620757578
+- Horizon 4:
+  - OGDBoth: params={'eta': 0.029469702954236822, 'kappa': 5.032305705987864} objective=5.468778949750622
+  - MWUMConcOnlyKL: params={'eta': 0.17973232378405318, 'kappa': 1.5823556074993874} objective=5.5528534813989054
+  - MWUMBothKL: params={'eta': 2.9499438147542123, 'kappa': 3.4245102609633378} objective=5.563164894537939
+  - OGDVanilla: params={'eta': 0.05184093746478533} objective=5.796234982125387
+  - MWUMVanilla: params={'eta': 1.8147265964847274} objective=8.79815432411173
+  - OGDConcOnly: params={'eta': 0.07598643993749689, 'kappa': 7.805506547777622} objective=8.91469542329136
+  - Median: params={} objective=14.424355637046158
+  - Mean: params={} objective=14.613262449811607
+- Horizon 8:
+  - MWUMBothKL: params={'eta': 1.4779367164159243, 'kappa': 3.500325229967218} objective=10.707712104572659
+  - OGDBoth: params={'eta': 0.005477724519907216, 'kappa': 1.4861073477971558} objective=10.983407977312808
+  - OGDVanilla: params={'eta': 0.005083257982033165} objective=11.002999171221804
+  - MWUMConcOnlyKL: params={'eta': 0.781849322599175, 'kappa': 0.9537720082048889} objective=11.105118435645517
+  - OGDConcOnly: params={'eta': 0.033268215320327636, 'kappa': 4.84571470836092} objective=11.389613792718214
+  - MWUMVanilla: params={'eta': 0.23450380966828216} objective=19.330832966091933
+  - Median: params={} objective=28.902900481992447
+  - Mean: params={} objective=28.984654140212907
+- Horizon 12:
+  - OGDBoth: params={'eta': 0.024392624523246854, 'kappa': 1.7656498978508024} objective=17.83083915009123
+  - OGDVanilla: params={'eta': 0.022538373995558445} objective=17.89313910736436
+  - MWUMConcOnlyKL: params={'eta': 0.1138172676524081, 'kappa': 2.9768496013593286} objective=18.027803704785
+  - MWUMBothKL: params={'eta': 1.910545444645835, 'kappa': 0.13770202533711998} objective=18.81749753877198
+  - OGDConcOnly: params={'eta': 0.028388290961090853, 'kappa': 4.623739798163082} objective=19.08183697970306
+  - MWUMVanilla: params={'eta': 0.5410727586287823} objective=24.308356333292977
+  - Median: params={} objective=38.63684361979445
+  - Mean: params={} objective=41.2825660787239
+- Horizon 16:
+  - MWUMBothKL: params={'eta': 0.32279472442376567, 'kappa': 7.014530120543268} objective=17.501983374668114
+  - OGDVanilla: params={'eta': 0.001007602754436529} objective=18.042410378326153
+  - OGDBoth: params={'eta': 0.0010118368331163896, 'kappa': 0.0010323243457558394} objective=18.047472161033262
+  - MWUMConcOnlyKL: params={'eta': 0.014722993424677061, 'kappa': 4.394097022148865} objective=18.51285070485755
+  - OGDConcOnly: params={'eta': 0.20780417601364995, 'kappa': 7.93897322946538} objective=20.3924640783246
+  - MWUMVanilla: params={'eta': 0.3807584825631592} objective=26.35785960187303
+  - Median: params={} objective=49.53089310880846
+  - Mean: params={} objective=57.3390341965621
+
+### Summary (Lower Objective Is Better)
+- Horizon 1:
+  - Mean: objective=1.1453 (std 1.3008), MSE=0.9366, MAE=0.6614, LINEX=1.1453, avg HHI=0.0556, excess vs best indiv=0.2270, improvement vs best indiv=-17.91%
+  - RLRuleBandit: objective=1.1872 (std 1.3432), MSE=0.9488, MAE=0.6641, LINEX=1.1872, avg HHI=0.0711, excess vs best indiv=0.2689, improvement vs best indiv=-21.23%
+  - Median: objective=1.2240 (std 1.4977), MSE=0.9244, MAE=0.6469, LINEX=1.2240, avg HHI=nan, excess vs best indiv=0.3057, improvement vs best indiv=-23.06%
+  - MWUMBothKL: objective=1.2340 (std 1.8619), MSE=0.9296, MAE=0.6552, LINEX=1.2340, avg HHI=0.0580, excess vs best indiv=0.3157, improvement vs best indiv=-19.76%
+  - MWUMVanilla: objective=1.2457 (std 1.9187), MSE=0.9258, MAE=0.6533, LINEX=1.2457, avg HHI=0.0634, excess vs best indiv=0.3274, improvement vs best indiv=-20.11%
+  - OGDBoth: objective=1.4951 (std 3.3960), MSE=0.9949, MAE=0.6871, LINEX=1.4951, avg HHI=0.1448, excess vs best indiv=0.5768, improvement vs best indiv=-39.48%
+  - OGDVanilla: objective=1.4952 (std 3.3966), MSE=0.9950, MAE=0.6872, LINEX=1.4952, avg HHI=0.1452, excess vs best indiv=0.5769, improvement vs best indiv=-39.49%
+  - OGDConcOnly: objective=1.5080 (std 3.4334), MSE=0.9456, MAE=0.6589, LINEX=1.5080, avg HHI=0.0587, excess vs best indiv=0.5897, improvement vs best indiv=-41.63%
+  - MWUMConcOnlyKL: objective=1.5300 (std 3.4576), MSE=0.9432, MAE=0.6576, LINEX=1.5300, avg HHI=0.0572, excess vs best indiv=0.6117, improvement vs best indiv=-40.50%
+  - RLKappaBandit: objective=1.8480 (std 3.7407), MSE=1.0182, MAE=0.6718, LINEX=1.8480, avg HHI=0.2012, excess vs best indiv=0.9297, improvement vs best indiv=-69.50%
+- Horizon 4:
+  - MWUMConcOnlyKL: objective=6.7869 (std 13.2281), MSE=2.6734, MAE=1.1539, LINEX=6.7869, avg HHI=0.0981, excess vs best indiv=-1.6858, improvement vs best indiv=31.34%
+  - MWUMBothKL: objective=6.8213 (std 13.2353), MSE=2.7464, MAE=1.1680, LINEX=6.8213, avg HHI=0.0977, excess vs best indiv=-1.6514, improvement vs best indiv=30.65%
+  - OGDBoth: objective=6.8556 (std 13.4148), MSE=2.7223, MAE=1.1495, LINEX=6.8556, avg HHI=0.1200, excess vs best indiv=-1.6171, improvement vs best indiv=31.14%
+  - OGDConcOnly: objective=7.1217 (std 13.3291), MSE=2.8533, MAE=1.2053, LINEX=7.1217, avg HHI=0.0699, excess vs best indiv=-1.3510, improvement vs best indiv=25.89%
+  - OGDVanilla: objective=7.2275 (std 14.7818), MSE=2.7601, MAE=1.1472, LINEX=7.2275, avg HHI=0.2728, excess vs best indiv=-1.2452, improvement vs best indiv=30.49%
+  - RLKappaBandit: objective=8.1468 (std 15.8964), MSE=2.4610, MAE=1.0878, LINEX=8.1468, avg HHI=0.3047, excess vs best indiv=-0.3259, improvement vs best indiv=-5.10%
+  - MWUMVanilla: objective=12.7491 (std 29.2804), MSE=3.5971, MAE=1.3588, LINEX=12.7491, avg HHI=0.9763, excess vs best indiv=4.2764, improvement vs best indiv=-64.43%
+  - RLRuleBandit: objective=22.7996 (std 68.0350), MSE=3.1398, MAE=1.2474, LINEX=22.7996, avg HHI=0.2262, excess vs best indiv=14.3269, improvement vs best indiv=-69.96%
+  - Mean: objective=24.3654 (std 94.8833), MSE=3.2852, MAE=1.2934, LINEX=24.3654, avg HHI=0.0556, excess vs best indiv=15.8927, improvement vs best indiv=-137.95%
+  - Median: objective=26.0678 (std 105.8986), MSE=3.2617, MAE=1.2652, LINEX=26.0678, avg HHI=nan, excess vs best indiv=17.5951, improvement vs best indiv=-151.08%
+- Horizon 8:
+  - OGDBoth: objective=16.6513 (std 39.3636), MSE=4.2353, MAE=1.4301, LINEX=16.6513, avg HHI=0.1909, excess vs best indiv=-9.8006, improvement vs best indiv=33.12%
+  - OGDVanilla: objective=16.7350 (std 39.2884), MSE=4.3390, MAE=1.4487, LINEX=16.7350, avg HHI=0.2530, excess vs best indiv=-9.7170, improvement vs best indiv=32.15%
+  - MWUMBothKL: objective=16.7514 (std 39.8362), MSE=3.6562, MAE=1.3459, LINEX=16.7514, avg HHI=0.1179, excess vs best indiv=-9.7005, improvement vs best indiv=33.95%
+  - MWUMConcOnlyKL: objective=17.0782 (std 40.4819), MSE=3.3518, MAE=1.2820, LINEX=17.0782, avg HHI=0.1351, excess vs best indiv=-9.3737, improvement vs best indiv=33.99%
+  - OGDConcOnly: objective=17.4321 (std 41.5773), MSE=3.7443, MAE=1.3780, LINEX=17.4321, avg HHI=0.0879, excess vs best indiv=-9.0198, improvement vs best indiv=31.54%
+  - RLKappaBandit: objective=18.8324 (std 41.4190), MSE=3.2323, MAE=1.2388, LINEX=18.8324, avg HHI=0.3237, excess vs best indiv=-7.6195, improvement vs best indiv=23.07%
+  - MWUMVanilla: objective=33.3487 (std 76.1908), MSE=4.8178, MAE=1.5453, LINEX=33.3487, avg HHI=0.9374, excess vs best indiv=6.8968, improvement vs best indiv=-35.10%
+  - Median: objective=313.3949 (std 2405.6005), MSE=4.5246, MAE=1.4948, LINEX=313.3949, avg HHI=nan, excess vs best indiv=286.9429, improvement vs best indiv=-314.28%
+  - RLRuleBandit: objective=342.8717 (std 1822.0478), MSE=4.3386, MAE=1.4657, LINEX=342.8717, avg HHI=0.2178, excess vs best indiv=316.4198, improvement vs best indiv=-1084.46%
+  - Mean: objective=410.9961 (std 2172.1443), MSE=4.7355, MAE=1.5649, LINEX=410.9961, avg HHI=0.0556, excess vs best indiv=384.5442, improvement vs best indiv=-891.22%
+- Horizon 12:
+  - MWUMConcOnlyKL: objective=30.4012 (std 98.3061), MSE=4.0319, MAE=1.4178, LINEX=30.4012, avg HHI=0.1029, excess vs best indiv=3.7845, improvement vs best indiv=5.47%
+  - MWUMVanilla: objective=34.5249 (std 69.0306), MSE=5.1895, MAE=1.5784, LINEX=34.5249, avg HHI=0.9616, excess vs best indiv=7.9082, improvement vs best indiv=-45.21%
+  - OGDBoth: objective=37.2180 (std 111.5265), MSE=3.8206, MAE=1.3443, LINEX=37.2180, avg HHI=0.1865, excess vs best indiv=10.6012, improvement vs best indiv=-58.28%
+  - MWUMBothKL: objective=38.9899 (std 112.3987), MSE=4.6342, MAE=1.4410, LINEX=38.9899, avg HHI=0.5543, excess vs best indiv=12.3731, improvement vs best indiv=-25.83%
+  - OGDVanilla: objective=99.9813 (std 723.0357), MSE=4.0500, MAE=1.3829, LINEX=99.9813, avg HHI=0.2742, excess vs best indiv=73.3646, improvement vs best indiv=-1022.01%
+  - OGDConcOnly: objective=134.9316 (std 1099.4697), MSE=4.0882, MAE=1.4313, LINEX=134.9316, avg HHI=0.0951, excess vs best indiv=108.3149, improvement vs best indiv=-611.96%
+  - Median: objective=1399.9163 (std 11218.6510), MSE=4.9674, MAE=1.5629, LINEX=1399.9163, avg HHI=nan, excess vs best indiv=1373.2995, improvement vs best indiv=-1781.20%
+  - Mean: objective=16512.9106 (std 153407.0176), MSE=5.3366, MAE=1.6608, LINEX=16512.9106, avg HHI=0.0556, excess vs best indiv=16486.2938, improvement vs best indiv=-89054.01%
+  - RLRuleBandit: objective=20318.4157 (std 156873.6650), MSE=4.7944, MAE=1.5229, LINEX=20318.4157, avg HHI=0.3233, excess vs best indiv=20291.7989, improvement vs best indiv=-97114.22%
+  - RLKappaBandit: objective=294057.6263 (std 2925509.6203), MSE=3.5195, MAE=1.2812, LINEX=294057.6263, avg HHI=0.3290, excess vs best indiv=294031.0095, improvement vs best indiv=-2701698.39%
+- Horizon 16:
+  - OGDVanilla: objective=55.8168 (std 167.6957), MSE=5.0804, MAE=1.5624, LINEX=55.8168, avg HHI=0.2399, excess vs best indiv=16.5665, improvement vs best indiv=-134.54%
+  - OGDBoth: objective=56.1265 (std 169.1184), MSE=5.0802, MAE=1.5623, LINEX=56.1265, avg HHI=0.2399, excess vs best indiv=16.8762, improvement vs best indiv=-138.95%
+  - MWUMVanilla: objective=70.3957 (std 227.7083), MSE=5.2597, MAE=1.5753, LINEX=70.3957, avg HHI=0.9563, excess vs best indiv=31.1454, improvement vs best indiv=-54.42%
+  - Median: objective=2873.3118 (std 20545.4040), MSE=5.0822, MAE=1.5788, LINEX=2873.3118, avg HHI=nan, excess vs best indiv=2834.0614, improvement vs best indiv=-4089.89%
+  - MWUMBothKL: objective=5207.3544 (std 38525.2181), MSE=4.2996, MAE=1.4567, LINEX=5207.3544, avg HHI=0.1094, excess vs best indiv=5168.1041, improvement vs best indiv=-110644.42%
+  - MWUMConcOnlyKL: objective=9720.3860 (std 81574.2418), MSE=4.2377, MAE=1.4533, LINEX=9720.3860, avg HHI=0.0956, excess vs best indiv=9681.1357, improvement vs best indiv=-218772.13%
+  - OGDConcOnly: objective=3857618.7478 (std 38380272.8789), MSE=4.3615, MAE=1.4767, LINEX=3857618.7478, avg HHI=0.0860, excess vs best indiv=3857579.4974, improvement vs best indiv=-92352958.64%
+  - RLRuleBandit: objective=18486554.2662 (std 183629412.1013), MSE=5.1469, MAE=1.5802, LINEX=18486554.2662, avg HHI=0.2508, excess vs best indiv=18486515.0159, improvement vs best indiv=-76374184.56%
+  - Mean: objective=24994677.9117 (std 192829032.5762), MSE=5.5875, MAE=1.6904, LINEX=24994677.9117, avg HHI=0.0556, excess vs best indiv=24994638.6614, improvement vs best indiv=-103906561.16%
+  - RLKappaBandit: objective=42054716758100172341248.0000 (std 418439148453869251461120.0000), MSE=4.4099, MAE=1.2912, LINEX=42054716758100172341248.0000, avg HHI=0.3352, excess vs best indiv=42054716758100172341248.0000, improvement vs best indiv=-1006838204822397380460544.00%
+
