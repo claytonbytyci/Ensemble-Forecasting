@@ -1,0 +1,157 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{makecell}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{caption}
+\captionsetup{font=small, labelfont=bf, skip=4pt}
+
+\begin{document}
+
+% ──────────────────────────────────────────────────────────────────────────────
+%  TABLE 1  ·  Simulation: MSE and LINEX, all methods, key horizons (100 seeds)
+% ──────────────────────────────────────────────────────────────────────────────
+\begin{table}[htbp]
+\centering
+\caption{Simulated data: MSE and LINEX ($a{=}1$) across key horizons.
+  Panel~A: mean\,(std) over 100 seeds; Panel~B: mean\,(SE) over 100 seeds
+  (seeds with $|\text{LINEX}|\geq10^4$ excluded from Panel~B).
+  500 Monte Carlo paths, $T{=}600$, burn-in 100.
+  HHI and $\Delta_\text{best}$ (percentage improvement
+  over the ex-post best individual forecaster) are reported at $h{=}8$.}
+\label{tab:sim}
+\setlength{\tabcolsep}{8pt}\renewcommand{\arraystretch}{1.0}\small
+\begin{tabular}{l rrrrr r r r}
+\toprule
+& \multicolumn{5}{c}{Loss (mean\,/\,std)} & \multicolumn{2}{c}{Avg.\ HHI} & \\
+\cmidrule(lr){2-6}\cmidrule(lr){7-8}
+Method & $h{=}1$ & $h{=}4$ & $h{=}8$ & $h{=}12$ & $h{=}16$ & $h{=}4$ & $h{=}8$ & $\Delta_{\text{best},8}$ \\
+\midrule
+\multicolumn{9}{l}{\textit{Panel A\,: MSE --- mean\,(std)}} \\[1pt]
+MWUM$_\text{Conc}$  & \makecell[r]{0.932\\\tiny(0.12)} & \makecell[r]{2.273\\\tiny(0.38)} & \makecell[r]{2.953\\\tiny(0.63)} & \makecell[r]{3.211\\\tiny(0.74)} & \makecell[r]{3.342\\\tiny(0.81)} & 0.274 & 0.314 & $+28.5\%$ \\
+MWUM$_\text{Both}$  & \makecell[r]{0.917\\\tiny(0.12)} & \makecell[r]{2.388\\\tiny(0.39)} & \makecell[r]{2.985\\\tiny(0.62)} & \makecell[r]{3.206\\\tiny(0.72)} & \makecell[r]{3.329\\\tiny(0.89)} & 0.174 & 0.220 & $+27.6\%$ \\
+MWUM$_\text{Van}$$^\dagger$   & \makecell[r]{0.917\\\tiny(0.12)} & \makecell[r]{3.210\\\tiny(0.55)} & \makecell[r]{4.196\\\tiny(0.92)} & \makecell[r]{4.724\\\tiny(2.79)} & \makecell[r]{4.389\\\tiny(1.12)} & 0.294 & 0.985$^\dagger$ & $-1.3\%$ \\
+\cmidrule(lr){1-9}
+OGD$_\text{Van}$    & \makecell[r]{0.923\\\tiny(0.12)} & \makecell[r]{2.499\\\tiny(0.41)} & \makecell[r]{3.324\\\tiny(0.68)} & \makecell[r]{3.595\\\tiny(0.85)} & \makecell[r]{3.722\\\tiny(0.95)} & 0.222 & 0.189 & $+19.3\%$ \\
+OGD$_\text{Both}$   & \makecell[r]{0.923\\\tiny(0.12)} & \makecell[r]{2.476\\\tiny(0.41)} & \makecell[r]{3.313\\\tiny(0.67)} & \makecell[r]{3.598\\\tiny(0.82)} & \makecell[r]{3.720\\\tiny(0.94)} & 0.144 & 0.184 & $+19.6\%$ \\
+OGD$_\text{Conc}$   & \makecell[r]{0.935\\\tiny(0.12)} & \makecell[r]{2.554\\\tiny(0.43)} & \makecell[r]{3.499\\\tiny(0.79)} & \makecell[r]{3.910\\\tiny(0.97)} & \makecell[r]{4.136\\\tiny(1.08)} & 0.087 & 0.098 & $+15.5\%$ \\
+\cmidrule(lr){1-9}
+RL-$\kappa$         & \makecell[r]{1.036\\\tiny(0.15)} & \makecell[r]{2.381\\\tiny(0.39)} & \makecell[r]{3.096\\\tiny(0.66)} & \makecell[r]{3.359\\\tiny(0.75)} & \makecell[r]{3.487\\\tiny(0.80)} & 0.372 & 0.383 & $+24.9\%$ \\
+RL-Rule             & \makecell[r]{0.928\\\tiny(0.12)} & \makecell[r]{2.872\\\tiny(0.55)} & \makecell[r]{3.731\\\tiny(0.90)} & \makecell[r]{4.130\\\tiny(1.05)} & \makecell[r]{4.298\\\tiny(1.16)} & 0.128 & 0.206 & $+9.9\%$ \\
+\cmidrule(lr){1-9}
+Mean                & \makecell[r]{0.937\\\tiny(0.12)} & \makecell[r]{3.285\\\tiny(0.56)} & \makecell[r]{4.736\\\tiny(1.05)} & \makecell[r]{5.337\\\tiny(1.34)} & \makecell[r]{5.588\\\tiny(1.50)} & 0.056 & 0.056 & $-14.4\%$ \\
+Median              & \makecell[r]{0.924\\\tiny(0.12)} & \makecell[r]{3.262\\\tiny(0.57)} & \makecell[r]{4.525\\\tiny(1.03)} & \makecell[r]{4.967\\\tiny(1.28)} & \makecell[r]{5.082\\\tiny(1.41)} & ---   & ---   & $-9.1\%$ \\
+\midrule
+\multicolumn{9}{l}{\textit{Panel B\,: LINEX ($a{=}1$) --- mean\,(SE) over 100 seeds}} \\[1pt]
+MWUM$_\text{Conc}$  & \makecell[r]{1.530\\\tiny(0.35)} & \makecell[r]{6.787\\\tiny(1.33)} & \makecell[r]{17.08\\\tiny(4.07)} & \makecell[r]{30.40\\\tiny(9.88)} & \makecell[r]{52.14\\\tiny(18.38)} & 0.274 & 0.314 & $+34.0\%$ \\
+MWUM$_\text{Both}$  & \makecell[r]{1.234\\\tiny(0.19)} & \makecell[r]{6.821\\\tiny(1.33)} & \makecell[r]{16.75\\\tiny(4.00)} & \makecell[r]{38.99\\\tiny(11.30)} & \makecell[r]{53.44\\\tiny(18.34)} & 0.174 & 0.220 & $+33.9\%$ \\
+MWUM$_\text{Van}$$^\dagger$  & \makecell[r]{1.246\\\tiny(0.19)} & \makecell[r]{12.75\\\tiny(2.94)} & \makecell[r]{33.35\\\tiny(7.66)} & \makecell[r]{34.52\\\tiny(6.94)} & \makecell[r]{70.40\\\tiny(22.89)} & 0.294 & 0.985 & $-35.1\%$ \\
+\cmidrule(lr){1-9}
+OGD$_\text{Van}$    & \makecell[r]{1.495\\\tiny(0.34)} & \makecell[r]{7.227\\\tiny(1.49)} & \makecell[r]{16.73\\\tiny(3.95)} & \makecell[r]{99.98\\\tiny(72.67)} & \makecell[r]{55.82\\\tiny(16.85)} & 0.222 & 0.189 & $+32.2\%$ \\
+OGD$_\text{Both}$   & \makecell[r]{1.495\\\tiny(0.34)} & \makecell[r]{6.856\\\tiny(1.35)} & \makecell[r]{16.65\\\tiny(3.96)} & \makecell[r]{37.22\\\tiny(11.21)} & \makecell[r]{56.13\\\tiny(17.00)} & 0.144 & 0.184 & $+33.1\%$ \\
+OGD$_\text{Conc}$   & \makecell[r]{1.508\\\tiny(0.35)} & \makecell[r]{7.122\\\tiny(1.34)} & \makecell[r]{17.43\\\tiny(4.18)} & \makecell[r]{24.53\\\tiny(4.63)} & \makecell[r]{59.49\\\tiny(18.99)} & 0.087 & 0.098 & $+31.5\%$ \\
+\cmidrule(lr){1-9}
+RL-$\kappa$         & \makecell[r]{1.848\\\tiny(0.38)} & \makecell[r]{8.147\\\tiny(1.60)} & \makecell[r]{18.83\\\tiny(4.16)} & \makecell[r]{32.85\\\tiny(10.00)} & \makecell[r]{57.60\\\tiny(18.32)} & 0.372 & 0.383 & $+23.1\%$ \\
+RL-Rule             & \makecell[r]{1.187\\\tiny(0.13)} & \makecell[r]{22.80\\\tiny(6.84)} & \makecell[r]{96.78\\\tiny(60.42)} & \makecell[r]{103.26\\\tiny(34.73)} & \makecell[r]{272.70\\\tiny(90.74)} & 0.128 & 0.206 & $-91.6\%$ \\
+\cmidrule(lr){1-9}
+Mean                & \makecell[r]{1.145\\\tiny(0.13)} & \makecell[r]{24.37\\\tiny(9.54)} & \makecell[r]{134.61\\\tiny(89.99)} & \makecell[r]{47.25\\\tiny(6.45)} & \makecell[r]{77.04\\\tiny(19.06)} & 0.056 & 0.056 & $-746.6\%$ \\
+Median              & \makecell[r]{1.224\\\tiny(0.15)} & \makecell[r]{26.07\\\tiny(10.64)} & \makecell[r]{73.58\\\tiny(31.05)} & \makecell[r]{41.75\\\tiny(5.49)} & \makecell[r]{53.87\\\tiny(9.32)} & ---   & ---   & $-272.1\%$ \\
+\bottomrule
+\end{tabular}
+\par\vspace{4pt}
+\begin{minipage}{\linewidth}\scriptsize
+\textit{Notes:}
+Equal-weight HHI baseline: $1/18\approx0.056$.
+100 seeds span a spectrum of macro volatility regimes.
+Panel~B SE\,$=$\,std/$\sqrt{n}$ after excluding seeds with $|\text{LINEX}|\geq10^4$;
+blowup counts by method available in the replication notebook.
+$^\dagger$ MWUM$_\text{Van}$ weight collapse: HHI\,$\to 1$ at $h{\geq}8$;
+  both entries excluded from comparisons.
+\end{minipage}
+\end{table}
+
+\clearpage
+
+% ──────────────────────────────────────────────────────────────────────────────
+%  TABLE 2  ·  SPF: per-horizon CPI results with block-bootstrap CIs
+% ──────────────────────────────────────────────────────────────────────────────
+\begin{table}[htbp]
+\centering
+\caption{Survey of Professional Forecasters (SPF): cumulative MSE and LINEX ($a{=}1$)
+  for two- and three-quarter-ahead CPI inflation forecasts ($T{=}34$ quarters, 12 panellists).
+  $\Delta_\text{best}$: percentage improvement in MSE over the ex-post best individual
+  panellist (positive\,$=$\,outperforms oracle).
+  [lo,\,hi]: 95\,\% moving-block-bootstrap CI
+  ($B{=}4{,}000$, $l{=}4$ quarters).}
+\label{tab:spf}
+\setlength{\tabcolsep}{3pt}\renewcommand{\arraystretch}{1.15}\footnotesize
+\begin{tabular}{l rrrr>{\scriptsize}r rrrr>{\scriptsize}r}
+\toprule
+& \multicolumn{5}{c}{CPI2} & \multicolumn{5}{c}{CPI3} \\
+\cmidrule(lr){2-6}\cmidrule(lr){7-11}
+Method & MSE & LINEX & HHI & $\Delta$ & [lo,\,hi] & MSE & LINEX & HHI & $\Delta$ & [lo,\,hi] \\
+\midrule
+MWUM$_\text{Conc}$  & 2.242 & 0.499 & 0.172 & $-41.4\%$ & $[-107,+2]$   & 4.429 & 0.946 & 0.294 & $+9.0\%^{\dagger}$ & $[-5.3,+23.6]$ \\
+MWUM$_\text{Both}$  & 2.439 & 0.536 & 0.083 & $-53.9\%$ & $[-136,-1]$   & 6.700 & 1.733 & 0.083 & $-37.7\%$          & $[-102,+6]$    \\
+MWUM$_\text{Van}$   & 2.439 & 0.536 & 0.083 & $-53.9\%$ & $[-136,-1]$   & 6.698 & 1.732 & 0.083 & $-37.7\%$          & $[-102,+6]$    \\
+\cmidrule(lr){1-11}
+OGD$_\text{Van}$    & 2.353 & 0.532 & 0.087 & $-48.5\%$ & $[-128,+3]$   & 6.172 & 1.525 & 0.086 & $-26.8\%$          & $[-75,+5]$     \\
+OGD$_\text{Both}$   & 2.352 & 0.532 & 0.087 & $-48.4\%$ & $[-128,+3]$   & 6.170 & 1.524 & 0.086 & $-26.8\%$          & $[-75,+5]$     \\
+OGD$_\text{Conc}$   & 2.416 & 0.535 & 0.084 & $-52.4\%$ & $[-135,0]$    & 6.313 & 1.649 & 0.084 & $-29.8\%$          & $[-82,+5]$     \\
+\cmidrule(lr){1-11}
+RL-$\kappa$         & 2.659 & 0.542 & 0.306 & $-67.8\%$ & $[-135,-19]$  & 5.287 & 0.840 & 0.726 & $-8.7\%$           & $[-56,+22]$    \\
+RL-Rule             & 2.368 & 0.538 & 0.087 & $-49.4\%$ & $[-124,-1]$   & 8.507 & 1.897 & 0.098 & $-74.8\%$          & $[-216,+6]$    \\
+\cmidrule(lr){1-11}
+Mean                & 2.452 & 0.537 & 0.083 & $-54.7\%$ & $[-139,-1]$   & 6.848 & 1.886 & 0.083 & $-40.7\%$          & $[-109,+6]$    \\
+Median              & 2.338 & 0.511 & ---   & $-47.5\%$ & $[-127,-1]$   & 6.537 & 1.703 & ---   & $-34.3\%$          & $[-95,+8]$     \\
+\bottomrule
+\end{tabular}
+\par\vspace{4pt}
+\begin{minipage}{\linewidth}\scriptsize
+\textit{Notes:}
+Single time series per horizon ($n{=}1$, $T{=}34$ quarters, 2014Q2--2022Q3).
+CI columns: 95\,\% percentile bootstrap, moving blocks (Kün\-sch 1989),
+$B{=}4{,}000$ resamples, $l{=}\lceil T^{1/3}\rceil{=}4$ quarters; wide CIs
+reflect the limited power available from a single short series.
+$^\dagger$~MWUM$_\text{Conc}$ at CPI3 is the only positive $\Delta$;
+Diebold--Mariano test (Newey--West SE, $L{=}4$ lags) gives one-sided $p{=}0.08$.
+Equal-weight HHI baseline: $1/12\approx0.083$.
+CPI1 omitted: MSE\,$\approx0.203$, LINEX\,$\approx0.025$ (indistinguishable across methods).
+\end{minipage}
+\end{table}
+
+\bigskip
+
+% ──────────────────────────────────────────────────────────────────────────────
+%  TABLE 3  ·  M3 Macro: transposed head-to-head summary
+% ──────────────────────────────────────────────────────────────────────────────
+\begin{table}[htbp]
+\centering
+\caption{M3 monthly macroeconomic competition (301 series, $T{=}18$):
+  head-to-head comparison of representative methods. LINEX not reported
+  (exponential overflow at M3 scale).}
+\label{tab:m3}
+\setlength{\tabcolsep}{7pt}\renewcommand{\arraystretch}{1.2}\small
+\begin{tabular}{l r r r r r r}
+\toprule
+& MWUM$_\text{Conc}$ & RL-$\kappa$ & RL-Rule & Median & \textbf{Mean} & OGD$^\dagger$ \\
+\midrule
+MSE (${\times}10^3$) & 478.03 & 478.01 & 624.44 & 683.25 & 696.63 & 1{,}039.0 \\
+MAE                  & 270.4  & 270.4  & 353.5  & 428.2  & 421.9  & 430.5 \\
+Impr.\ vs Mean       & $+31.4\%$ & $+31.4\%$ & $+10.4\%$ & $+1.9\%$ & 0\% & $-49.2\%$ \\
+\bottomrule
+\end{tabular}
+\par\vspace{4pt}
+\begin{minipage}{\linewidth}\scriptsize
+\textit{Notes:} MWUM$_\text{Both}$ and MWUM$_\text{Van}$ yield MSE\,$=478.43{\times}10^3$
+  ($<0.1\%$ from MWUM$_\text{Conc}$) and are omitted. All three OGD variants yield
+  identical results to two decimal places; one shown. RL-$\kappa$ and MWUM$_\text{Conc}$
+  differ by just 18 MSE units (0.004\%) --- both converge to near-identical near-degenerate
+  concentration (HHI\,$\approx 0.89$) under $T{=}18$, but MWUM's scale-invariant updates
+  select the correct forecaster while OGD step sizes --- calibrated at SPF scale --- diverge.
+  Impr.\ vs Mean: $(696.63 - \text{method})/696.63$; positive $=$ better than equal-weight mean.
+\end{minipage}
+\end{table}
+
+\end{document}
